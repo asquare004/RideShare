@@ -14,4 +14,4 @@ This project was done by :
 
 * [I. Anders Arnold](https://github.com/asquare004)
 * [Krish Gujarati](https://github.com/Krish-Gujarati)
-* [Srushti Chaudhari](https://github.com/swathivc)
+* [Swati Vinod Chavan](https://github.com/swathivc)

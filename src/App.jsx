@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import RideSearch from './pages/RideSearch';
 import RideCreate from './pages/RideCreate';
@@ -7,10 +7,20 @@ import RideProposals from './pages/RideProposals';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
-
+import { auth } from './firebase/config';
+import { onAuthStateChanged } from 'firebase/auth';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('search');
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const renderPage = () => {
     switch(currentPage) {

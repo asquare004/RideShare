@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
-function RideProposals() {
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
+
+function FindDriver() {
+  const [timeLeft, setTimeLeft] = useState(60); // 10 minutes in seconds
   const [proposals, setProposals] = useState([
     // Dummy data - replace with actual API data
     {
@@ -130,4 +131,4 @@ function RideProposals() {
   );
 }
 
-export default RideProposals; 
+export default FindDriver; 

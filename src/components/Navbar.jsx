@@ -1,16 +1,16 @@
 import React from 'react';
 import { Link} from 'react-router-dom';
 
-function Navbar({ setCurrentPage }) {
+function Navbar() {
   return (
     <nav className="bg-white border-b border-gray-100 shadow-sm fixed w-full top-0 z-50">
       <div className="container mx-auto px-8 py-4 flex justify-between items-center">
         <div 
-          onClick={() => setCurrentPage('search')}
+         
           className="flex items-center cursor-pointer"
         >
-          <span className="text-3xl text-blue-600 font-sans tracking-tight ">
-            Ride<span className="font-semibold">Share</span>
+          <span className="text-3xl text-blue-600 font-sans  font-semiboldtracking-tight ">
+            Ride<span className="font-bold">Share</span>
           </span>
         </div>
         
@@ -34,6 +34,16 @@ function Navbar({ setCurrentPage }) {
             className="text-gray-600 hover:text-blue-600 text-base font-inter transition-colors duration-200"
           >
             Create Ride
+          </button>
+          </Link>
+          <Link
+        to='/my-trips'
+        className='self-center whitespace-nowrap text-sm sm:text-xl font-semibold dark:text-white'
+      >
+          <button 
+            className="text-gray-600 hover:text-blue-600 text-base font-inter transition-colors duration-200"
+          >
+            My Trips
           </button>
           </Link>
           <Link

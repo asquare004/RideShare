@@ -66,3 +66,19 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+<<<<<<< HEAD
+=======
+
+@import 'leaflet/dist/leaflet.css';
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.leaflet-control-container {
+  z-index: 2;
+  position: relative;
+}
+>>>>>>> 7a3b527657ce141610d3424c358b0b9516ef5155

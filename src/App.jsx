@@ -3,45 +3,29 @@ import Navbar from './components/Navbar';
 import RideSearch from './pages/RideSearch';
 import RideCreate from './pages/RideCreate';
 import Profile from './pages/Profile';
-import RideProposals from './pages/RideProposals';
+import FindDriver from './pages/FindDriver';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
+import MyTrips from './pages/MyTrips';
 
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('search');
-
-  const renderPage = () => {
-    switch(currentPage) {
-      case 'search': return <RideSearch />;
-      case 'create': return <RideCreate />;
-      case 'profile': return <Profile />;
-      case 'book-ride':return <RideCreate />;
-      default: return <RideSearch />;
-      // case 'proposals': return <RideProposals />;
-    }
-  };
-
   return (
     <BrowserRouter>
     <div className="min-h-screen bg-gray-50">
-      <Navbar setCurrentPage={setCurrentPage} />
-      
+      <Navbar  />
       <Routes>
         <Route path='/' element={<RideSearch />} />
         <Route path='/create-ride' element={<RideCreate />} />
         <Route path='/profile' element={<Profile />} />
-        {/* <Route path='/sign-up' element={<SignUp />} /> */}
         <Route path='/search' element={<RideSearch />} />
         <Route path='/book-ride' element={<RideCreate />} />
         <Route path='/sign-in' element={<SignIn />} />
         <Route path='/sign-up' element={<SignUp />} />
-        
+        <Route path='/my-trips' element={<MyTrips />} />
+        <Route path='/find-driver' element={<FindDriver />} />
       </Routes>
-      {/* <main className="container mx-auto px-4 py-8">
-        {renderPage()}
-      </main> */}
     </div>
     </BrowserRouter>
   );

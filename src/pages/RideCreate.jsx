@@ -1,112 +1,15 @@
-<<<<<<< HEAD
-import React, { useContext, useState } from 'react';
-import { RideContext } from '../context/RideContext';
-import { useNavigate} from 'react-router-dom';
-
-function RideCreate() {
-  const { addRide } = useContext(RideContext);
-  const [rideDetails, setRideDetails] = useState({});
-  const navigate = useNavigate();
-
- 
-
-  const handleSubmit = (e) => {
-    
-    e.preventDefault();
-    addRide({
-      driver: { name: 'Current User', rating: 4.5 },
-      ...rideDetails
-    });
-    navigate('/find-driver');
-    
-    // Redirect to proposals page
-    
-    // You might want to use a proper router instead of this approach
-    // setCurrentPage('proposals');
-  };
-
-  
-  return (
-    <div className="max-w-md mx-auto bg-white shadow-md rounded-lg p-6 mt-24">
-      <h2 className="text-2xl font-semibold mb-6 text-center">Create a Ride</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input 
-          type="text" 
-          placeholder="Source" 
-          value={rideDetails.source}
-          onChange={(e) => setRideDetails({...rideDetails, source: e.target.value})}
-          className="w-full border p-2 rounded"
-          required
-        />
-        <input 
-          type="text" 
-          placeholder="Destination" 
-          value={rideDetails.destination}
-          onChange={(e) => setRideDetails({...rideDetails, destination: e.target.value})}
-          className="w-full border p-2 rounded"
-          required
-        />
-            <input 
-        type="datetime-local" 
-        value={rideDetails.departureTime}
-        onChange={(e) => { 
-          console.log(e);
-          let str = e.target.value;
-          str = str.slice(0, 10); 
-          setRideDetails({ ...rideDetails, departureTime: e.target.value, date: str }); 
-        }}
-        className="w-full border p-2 rounded"
-        required
-      />
-        <select 
-          value={rideDetails.carType}
-          onChange={(e) => setRideDetails({...rideDetails, carType: e.target.value})}
-          className="w-full border p-2 rounded"
-          required
-        >
-          <option value="">Select Car Type</option>
-          <option value="Sedan">Sedan</option>
-          <option value="SUV">SUV</option>
-          <option value="Hatchback">Hatchback</option>
-        </select>
-        <input 
-          type="number" 
-          placeholder="Available Seats" 
-          value={rideDetails.availableSeats}
-          onChange={(e) => setRideDetails({...rideDetails, availableSeats: parseInt(e.target.value)})}
-          min="1" 
-          max="6"
-          className="w-full border p-2 rounded"
-          required
-        />
-        <input 
-          type="number" 
-          placeholder="Price per Person" 
-          value={rideDetails.price}
-          onChange={(e) => setRideDetails({...rideDetails, price: parseFloat(e.target.value)})}
-          min="0"
-          step="0.01"
-          className="w-full border p-2 rounded"
-          required
-        />
-        
-        <button 
-          type="submit" 
-          className="w-full bg-blue-600 text-white py-3 rounded-full hover:bg-blue-700"
-        >
-          Create Ride
-        </button>
-      </form>
-=======
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Map from '../components/Map';
+import LocationInput from '../components/LocationInput';
 
 function RideCreate() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     source: '',
     destination: '',
+    sourceCord: '',
+    destinationCord: '',
     date: '',
     departureTime: '',
     availableSeats: '',
@@ -114,40 +17,86 @@ function RideCreate() {
   });
 
   const [markers, setMarkers] = useState({
-    source: null,
-    destination: null
+    sourceCord: null,
+    destinationCord: null
   });
+
+  const handleSourceSelect = (location) => {
+    setFormData(prev => ({
+      ...prev,
+      source: location.name,
+      sourceCord: `${location.coordinates.lat},${location.coordinates.lng}`
+    }));
+    setMarkers(prev => ({
+      ...prev,
+      sourceCord: location.coordinates
+    }));
+  };
+
+  const handleDestinationSelect = (location) => {
+    setFormData(prev => ({
+      ...prev,
+      destination: location.name,
+      destinationCord: `${location.coordinates.lat},${location.coordinates.lng}`
+    }));
+    setMarkers(prev => ({
+      ...prev,
+      destinationCord: location.coordinates
+    }));
+  };
 
   const handleMapClick = (event) => {
     const { lat, lng } = event.latlng;
     
-    if (!markers.source) {
-      setMarkers(prev => ({
-        ...prev,
-        source: { lat, lng }
-      }));
-      setFormData(prev => ({
-        ...prev,
-        source: `${lat},${lng}`
-      }));
-    } else if (!markers.destination) {
-      setMarkers(prev => ({
-        ...prev,
-        destination: { lat, lng }
-      }));
-      setFormData(prev => ({
-        ...prev,
-        destination: `${lat},${lng}`
-      }));
+    // Reverse geocoding to get place name from coordinates
+    const reverseGeocode = async (lat, lng, type) => {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`
+        );
+        const data = await response.json();
+        
+        if (type === 'source') {
+          setFormData(prev => ({
+            ...prev,
+            source: data.display_name,
+            sourceCord: `${lat},${lng}`
+          }));
+          setMarkers(prev => ({
+            ...prev,
+            sourceCord: { lat, lng }
+          }));
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            destination: data.display_name,
+            destinationCord: `${lat},${lng}`
+          }));
+          setMarkers(prev => ({
+            ...prev,
+            destinationCord: { lat, lng }
+          }));
+        }
+      } catch (error) {
+        console.error('Error in reverse geocoding:', error);
+      }
+    };
+
+    if (!markers.sourceCord) {
+      reverseGeocode(lat, lng, 'source');
+    } else if (!markers.destinationCord) {
+      reverseGeocode(lat, lng, 'destination');
     }
   };
 
   const resetMarkers = () => {
-    setMarkers({ source: null, destination: null });
+    setMarkers({ sourceCord: null, destinationCord: null });
     setFormData(prev => ({
       ...prev,
       source: '',
-      destination: ''
+      destination: '',
+      sourceCord: '',
+      destinationCord: ''
     }));
   };
 
@@ -155,7 +104,8 @@ function RideCreate() {
     e.preventDefault();
     // Handle form submission
     console.log('Form submitted:', formData);
-    navigate('/');
+
+    navigate('/find-driver');
   };
 
   const handleChange = (e) => {
@@ -177,10 +127,10 @@ function RideCreate() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Map Section */}
+            {/* Map Section - Left Side */}
             <div className="bg-white shadow-md rounded-lg p-4">
               <div className="flex justify-between mb-4">
-                <h3 className="text-lg font-semibold">Select Route on Map</h3>
+                <h3 className="text-lg font-semibold">Route on Map</h3>
                 <button 
                   onClick={resetMarkers}
                   className="text-sm text-blue-600 hover:text-blue-800"
@@ -192,14 +142,37 @@ function RideCreate() {
               <Map markers={markers} handleMapClick={handleMapClick} />
               
               <div className="mt-2 text-sm text-gray-600">
-                {!markers.source && !markers.destination && "Click on the map to set source location"}
-                {markers.source && !markers.destination && "Click on the map to set destination"}
-                {markers.source && markers.destination && "Route selected!"}
+                {!markers.sourceCord && !markers.destinationCord && "Click on the map to set source"}
+                {markers.sourceCord && !markers.destinationCord && "Click on the map to set destination"}
+                {markers.sourceCord && markers.destinationCord && "Route selected!"}
               </div>
             </div>
 
-            {/* Form Section */}
+            {/* Form Section - Right Side */}
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Location Inputs */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Source Location</label>
+                  <LocationInput
+                    placeholder="Enter source location"
+                    value={formData.source}
+                    onChange={(value) => setFormData(prev => ({ ...prev, source: value }))}
+                    onLocationSelect={handleSourceSelect}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Destination Location</label>
+                  <LocationInput
+                    placeholder="Enter destination location"
+                    value={formData.destination}
+                    onChange={(value) => setFormData(prev => ({ ...prev, destination: value }))}
+                    onLocationSelect={handleDestinationSelect}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700">Date</label>
                 <input
@@ -262,7 +235,6 @@ function RideCreate() {
           </div>
         </div>
       </div>
->>>>>>> 7a3b527657ce141610d3424c358b0b9516ef5155
     </div>
   );
 }

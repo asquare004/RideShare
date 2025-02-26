@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
 
+
 function FindDriver() {
   const [timeLeft, setTimeLeft] = useState(60); // 10 minutes in seconds
   const [proposals, setProposals] = useState([
@@ -52,12 +53,15 @@ function FindDriver() {
   const sortedProposals = [...proposals].sort((a, b) => b.totalPrice - a.totalPrice);
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
+    <div className="max-w-5xl mx-auto p-4 pt-24">
       <div className="text-center mb-8">
-        <div className="text-4xl font-bold mb-4">{formatTime(timeLeft)}</div>
         {timeLeft > 0 && (
-          <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="flex flex-col items-center mt-8">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-600 border-t-transparent mb-4"></div>
+            <p className="text-gray-600">Searching for drivers...</p>
+            <div className="text-3xl font-bold text-blue-600 mt-4">
+              {formatTime(timeLeft)}
+            </div>
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
@@ -23,156 +23,69 @@ const blueIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
-// Routing Control Component
-function RoutingControl({ markers }) {
-  const map = useMap();
+function Map({ markers, handleMapClick }) {
+  const mapRef = useRef(null);
+  const markerLayerRef = useRef(null);
+  const routingControlRef = useRef(null);
 
   useEffect(() => {
-    if (!map || !markers.source || !markers.destination) return;
-
-    const routingControl = L.Routing.control({
-      waypoints: [
-        L.latLng(markers.source.lat, markers.source.lng),
-        L.latLng(markers.destination.lat, markers.destination.lng)
-      ],
-      routeWhileDragging: false,
-      addWaypoints: false,
-      draggableWaypoints: false,
-      fitSelectedRoutes: true,
-      showAlternatives: false,
-      lineOptions: {
-        styles: [
-          { color: '#6366F1', opacity: 0.8, weight: 6 }
-        ]
-      },
-      createMarker: () => { return null; } // Disable default markers
-    }).addTo(map);
-
-    return () => map.removeControl(routingControl);
-  }, [map, markers.source, markers.destination]);
-
-  return null;
-}
-
-function LocationButton({ setCurrentLocation }) {
-  const map = useMap();
-  const [loading, setLoading] = useState(false);
-  
-  const handleClick = () => {
-    setLoading(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude: lat, longitude: lng } = position.coords;
-          setCurrentLocation({ lat, lng });
-          map.flyTo([lat, lng], 13);
-          setLoading(false);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          alert("Location access denied or unavailable.");
-          setLoading(false);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0
-        }
-      );
-    } else {
-      alert("Geolocation is not supported by your browser.");
-      setLoading(false);
+    // Initialize map if it doesn't exist
+    if (!mapRef.current) {
+      mapRef.current = L.map('map').setView([20.5937, 78.9629], 5); // Center on India
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(mapRef.current);
+      mapRef.current.on('click', handleMapClick);
     }
-  };
 
-  return (
-    <button
-      className="bg-white p-2 rounded-md shadow-md hover:bg-gray-100"
-      style={{ 
-        position: 'absolute', 
-        top: '20px', 
-        right: '20px', 
-        zIndex: 1000,
-        cursor: 'pointer'
-      }}
-      onClick={handleClick}
-      disabled={loading}
-    >
-      {loading ? "Locating..." : "📍 My Location"}
-    </button>
-  );
-}
+    // Clear existing markers and routing
+    if (markerLayerRef.current) {
+      markerLayerRef.current.clearLayers();
+    }
+    if (routingControlRef.current) {
+      mapRef.current.removeControl(routingControlRef.current);
+    }
 
-function MapClickHandler({ onMapClick }) {
-  useMapEvents({
-    click: (e) => {
-      onMapClick(e);
-    },
-  });
-  return null;
-}
+    // Create a new feature group for markers
+    markerLayerRef.current = L.featureGroup().addTo(mapRef.current);
 
-function Map({ markers, handleMapClick }) {
-  const [currentLocation, setCurrentLocation] = useState(null);
-  
-  const positions = markers.source && markers.destination ? [
-    [markers.source.lat, markers.source.lng],
-    [markers.destination.lat, markers.destination.lng]
-  ] : [];
+    // Add markers if they exist
+    if (markers.sourceCord) {
+      L.marker([markers.sourceCord.lat, markers.sourceCord.lng])
+        .bindPopup('Source')
+        .addTo(markerLayerRef.current);
+    }
 
-  const onMapClick = (e) => {
-    const { lat, lng } = e.latlng;
-    handleMapClick({ latlng: { lat, lng } });
-  };
+    if (markers.destinationCord) {
+      L.marker([markers.destinationCord.lat, markers.destinationCord.lng])
+        .bindPopup('Destination')
+        .addTo(markerLayerRef.current);
+    }
 
-  return (
-    <MapContainer 
-      center={[20.5937, 78.9629]} // Center of India
-      zoom={5}
-      style={{ height: '400px', width: '100%' }}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      <MapClickHandler onMapClick={onMapClick} />
-      <LocationButton setCurrentLocation={setCurrentLocation} />
-      
-      {currentLocation && (
-        <Marker 
-          position={[currentLocation.lat, currentLocation.lng]}
-          icon={blueIcon}
-        >
-          <Popup>Your Current Location</Popup>
-        </Marker>
-      )}
-      
-      {markers.source && (
-        <Marker position={[markers.source.lat, markers.source.lng]}>
-          <Popup>Source Location</Popup>
-        </Marker>
-      )}
-      
-      {markers.destination && (
-        <Marker position={[markers.destination.lat, markers.destination.lng]}>
-          <Popup>Destination Location</Popup>
-        </Marker>
-      )}
+    // Add routing if both markers exist
+    if (markers.sourceCord && markers.destinationCord) {
+      routingControlRef.current = L.Routing.control({
+        waypoints: [
+          L.latLng(markers.sourceCord.lat, markers.sourceCord.lng),
+          L.latLng(markers.destinationCord.lat, markers.destinationCord.lng)
+        ],
+        routeWhileDragging: false,
+        showAlternatives: false,
+        addWaypoints: false,
+        draggableWaypoints: false,
+      }).addTo(mapRef.current);
 
-      {positions.length > 0 && (
-        <Polyline 
-          positions={positions}
-          color="blue"
-          weight={3}
-          opacity={0.7}
-        />
-      )}
+      // Fit bounds to show both markers
+      const bounds = markerLayerRef.current.getBounds();
+      mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+    }
 
-      {markers.source && markers.destination && (
-        <RoutingControl markers={markers} />
-      )}
-    </MapContainer>
-  );
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.off('click', handleMapClick);
+      }
+    };
+  }, [markers, handleMapClick]); // Re-run effect when markers change
+
+  return <div id="map" style={{ height: '400px', width: '100%' }} />;
 }
 
 export default Map; 

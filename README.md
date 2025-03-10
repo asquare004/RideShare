@@ -8,6 +8,12 @@ This doc contains all the questions that we asked our mentors along with user st
 
 Business Requirements Document (BRD) : [BRD](https://docs.google.com/document/d/1UHv8fVt0MKs4Zq6iB7Z_kER3EvoJWWKRLxF-UzSRmIQ/edit?usp=sharing)
 
+Software Requirements Specification (SRS) : [SRS](https://docs.google.com/document/d/1qNyec1TKy8n5svkEe9PDR6_u-D6mcSFK_bpQMwyhsfo/edit?usp=sharing)
+
+Physical View : [Physical View](https://docs.google.com/document/d/1P0ebFM5bo7HwdasGPTsim7UIKWqfNJjB8Z93gi2HZiU/edit?usp=sharing)
+
+Logical View : [Logical View](https://docs.google.com/document/d/1bxy8Y_XrF84Wq-FcCjxlzpk6nuhIKjQ4AuCiZlj0HuA/edit?usp=sharing)
+
 ## Team Members
 
 This project was done by :

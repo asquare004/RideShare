@@ -5,6 +5,7 @@ import LocationInput from '../components/LocationInput';
 
 function RideCreate() {
   const navigate = useNavigate();
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [formData, setFormData] = useState({
     source: '',
     destination: '',
@@ -20,6 +21,45 @@ function RideCreate() {
     sourceCord: null,
     destinationCord: null
   });
+
+  const handleGetLocation = async () => {
+    // First, show a custom popup asking for permission
+    const userWantsToShare = window.confirm(
+      'Would you like to share your location to help set your ride details?\n\nThis will help accurately mark your position on the map.'
+    );
+
+    if (!userWantsToShare) {
+      return;
+    }
+
+    try {
+      const permission = await navigator.permissions.query({ name: 'geolocation' });
+      
+      if (permission.state === 'denied') {
+        alert('Please enable location access in your browser settings.');
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setCurrentLocation({ lat: latitude, lng: longitude });
+        },
+        (error) => {
+          console.error("Error getting current location:", error);
+          alert('Unable to get your location. Please try again.');
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0
+        }
+      );
+    } catch (error) {
+      console.error("Error checking location permission:", error);
+      alert('Unable to access location services.');
+    }
+  };
 
   const handleSourceSelect = (location) => {
     setFormData(prev => ({
@@ -48,7 +88,6 @@ function RideCreate() {
   const handleMapClick = (event) => {
     const { lat, lng } = event.latlng;
     
-    // Reverse geocoding to get place name from coordinates
     const reverseGeocode = async (lat, lng, type) => {
       try {
         const response = await fetch(
@@ -139,7 +178,12 @@ function RideCreate() {
                 </button>
               </div>
               
-              <Map markers={markers} handleMapClick={handleMapClick} />
+              <Map 
+                markers={markers} 
+                handleMapClick={handleMapClick}
+                currentLocation={currentLocation}
+                onLocationRequest={handleGetLocation}
+              />
               
               <div className="mt-2 text-sm text-gray-600">
                 {!markers.sourceCord && !markers.destinationCord && "Click on the map to set source"}

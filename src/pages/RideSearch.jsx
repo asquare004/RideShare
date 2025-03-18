@@ -1,136 +1,191 @@
-import React, { useContext, useState } from 'react';
-import { RideContext } from '../context/RideContext';
-import Map from '../components/Map';
-import ClientOnly from '../components/ClientOnly';
+import React, { useState, useEffect } from 'react';
+import { getFirestore, collection, query, where, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { auth } from '../firebase/config';
+import RideCard from '../components/RideCard';
+import { useNavigate } from 'react-router-dom';
+import SearchForm from '../components/SearchForm';
 
 function RideSearch() {
-  const { rides } = useContext(RideContext);
-  const [searchParams, setSearchParams] = useState({
-    source: null,
-    destination: null,
-    maxPrice: '',
-    date: '',
-  });
+  const [rides, setRides] = useState([]);
+  const [source, setSource] = useState('');
+  const [destination, setDestination] = useState('');
+  const [filteredRides, setFilteredRides] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const db = getFirestore();
+  const navigate = useNavigate();
 
-  const [markers, setMarkers] = useState({
-    source: null,
-    destination: null
-  });
-
-  const handleMapClick = (event) => {
-    const { lat, lng } = event.latlng;
-    
-    if (!markers.source) {
-      setMarkers(prev => ({
-        ...prev,
-        source: { lat, lng }
-      }));
-      setSearchParams(prev => ({
-        ...prev,
-        source: `${lat},${lng}`
-      }));
-    } else if (!markers.destination) {
-      setMarkers(prev => ({
-        ...prev,
-        destination: { lat, lng }
-      }));
-      setSearchParams(prev => ({
-        ...prev,
-        destination: `${lat},${lng}`
-      }));
+  // Update the dummy data with 2026 dates
+  const dummyRides = [
+    {
+      id: '1',
+      source: 'Mumbai',
+      destination: 'Pune',
+      departureTime: '09:00 AM',
+      date: '2026-03-25',
+      availableSeats: 3,
+      price: 450,
+      driver: {
+        name: 'John Doe',
+        rating: 4.8
+      }
+    },
+    {
+      id: '2',
+      source: 'Delhi',
+      destination: 'Agra',
+      departureTime: '10:30 AM',
+      date: '2026-03-26',
+      availableSeats: 2,
+      price: 550,
+      driver: {
+        name: 'Jane Smith',
+        rating: 4.9
+      }
+    },
+    {
+      id: '3',
+      source: 'Chicago, IL',
+      destination: 'Detroit, MI',
+      departureTime: '02:00 PM',
+      date: '2026-03-27',
+      availableSeats: 4,
+      price: 35,
+      driver: {
+        name: 'Mike Johnson',
+        rating: 4.7
+      }
+    },
+    {
+      id: '4',
+      source: 'Seattle, WA',
+      destination: 'Portland, OR',
+      departureTime: '11:00 AM',
+      date: '2026-03-25',
+      availableSeats: 3,
+      price: 40,
+      driver: {
+        name: 'Sarah Wilson',
+        rating: 4.6
+      }
+    },
+    {
+      id: '5',
+      source: 'Miami, FL',
+      destination: 'Orlando, FL',
+      departureTime: '08:30 AM',
+      date: '2026-03-26',
+      availableSeats: 2,
+      price: 50,
+      driver: {
+        name: 'David Brown',
+        rating: 4.9
+      }
     }
+  ];
+
+  // Replace the existing useEffect with this one for testing
+  useEffect(() => {
+    setRides(dummyRides);
+    setFilteredRides(dummyRides);
+    setLoading(false);
+  }, []);
+
+  // Update the filtering logic
+  useEffect(() => {
+    let filtered = [...rides];
+
+    if (source) {
+      filtered = filtered.filter(ride => 
+        ride.source.toLowerCase().includes(source.toLowerCase())
+      );
+    }
+
+    if (destination) {
+      filtered = filtered.filter(ride => 
+        ride.destination.toLowerCase().includes(destination.toLowerCase())
+      );
+    }
+
+    if (selectedDate) {
+      // Format selectedDate to match the format in dummyRides (YYYY-MM-DD)
+      filtered = filtered.filter(ride => ride.date === selectedDate);
+      console.log('Selected Date:', selectedDate); // For debugging
+      console.log('Filtered Rides:', filtered); // For debugging
+    }
+
+    setFilteredRides(filtered);
+  }, [source, destination, selectedDate, rides]);
+
+  // Simplify the source and destination handlers
+  const handleSourceChange = (e) => {
+    setSource(e.target.value);
   };
 
-  const resetMarkers = () => {
-    setMarkers({ source: null, destination: null });
-    setSearchParams(prev => ({
-      ...prev,
-      source: null,
-      destination: null
-    }));
+  const handleDestinationChange = (e) => {
+    setDestination(e.target.value);
   };
 
-  function formatDate(dateString) {
-    const date = new Date(dateString);
-  
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return date.toLocaleDateString('en-US', options);
-  }
+  const handleBookRide = (ride) => {
+    if (!auth.currentUser) {
+      setError('Please sign in to book a ride');
+      return;
+    }
 
-  const filteredRides = rides.filter(ride => 
-    (!searchParams.maxPrice || ride.price <= parseFloat(searchParams.maxPrice)) &&
-    (!searchParams.date || ride.date === searchParams.date)
-  );
+    // Navigate to booking details page with ride information
+    navigate('/booking-details', { state: { ride } });
+  };
+
+  // Handle search form submission
+  const handleSearch = (params) => {
+    console.log('Search Params:', params); // For debugging
+    setSource(params.source);
+    setDestination(params.destination);
+    setSelectedDate(params.date);
+  };
 
   return (
-    <div className="flex gap-6 mt-24 px-6">
-      <div className="w-1/2">
-        <div className="bg-white shadow-md rounded-lg p-4">
-          <div className="flex justify-between mb-4">
-            <h2 className="text-xl font-semibold">Select Route on Map</h2>
-            <button 
-              onClick={resetMarkers}
-              className="text-sm text-blue-600 hover:text-blue-800"
-            >
-              Reset Markers
-            </button>
+    <div className="container mx-auto p-4 pt-24">
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white rounded-lg shadow px-5 py-6 sm:px-6">
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900">Find a Ride</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Search for available rides and book your journey
+            </p>
           </div>
-          
-          <ClientOnly>
-            <Map markers={markers} handleMapClick={handleMapClick} />
-          </ClientOnly>
-          
-          <div className="mt-2 text-sm text-gray-600">
-            {!markers.source && !markers.destination && "Click on the map to set source location"}
-            {markers.source && !markers.destination && "Click on the map to set destination"}
-            {markers.source && markers.destination && "Route selected!"}
-          </div>
-        </div>
-      </div>
 
-      <div className="w-1/2 space-y-6">
-        <div className="bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-2xl font-semibold mb-4">Find Your Ride</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <input 
-              type="date" 
-              value={searchParams.date}
-              onChange={(e) => setSearchParams({...searchParams, date: e.target.value})}
-              className="border p-2 rounded"
-            />
-            <input 
-              type="number" 
-              placeholder="Max Price" 
-              value={searchParams.maxPrice}
-              onChange={(e) => setSearchParams({...searchParams, maxPrice: e.target.value})}
-              className="border p-2 rounded"
-            />
-          </div>
-        </div>
+          {/* Search Form */}
+          <SearchForm onSearch={handleSearch} />
 
-        <div className="space-y-4">
-          {filteredRides.map(ride => (
-            <div 
-              key={ride.id} 
-              className="bg-white shadow-md rounded-lg p-4 flex justify-between items-center"
-            >
-              <div>
-                <h3 className="text-lg font-semibold">{ride.driver.name}</h3> 
-                <div className="text-gray-600">
-                  {ride.source} → {ride.destination}
-                </div>
-                <div className="text-sm text-gray-500">
-                  {formatDate(ride.date)} | {ride.departureTime} | {ride.availableSeats} seats left | ⭐ {ride.driver.rating}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-blue-600">${ride.price}</div>
-                <button className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-full">
-                  Book Ride
-                </button>
-              </div>
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+              {error}
             </div>
-          ))}
+          )}
+
+          {/* Rides List */}
+          {loading ? (
+            <div className="text-center py-4">Loading rides...</div>
+          ) : filteredRides.length === 0 ? (
+            <div className="text-center text-gray-500 py-4">
+              {selectedDate 
+                ? `No rides found for ${new Date(selectedDate).toLocaleDateString()}`
+                : "No rides found matching your criteria"}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredRides.map(ride => (
+                <RideCard
+                  key={ride.id}
+                  ride={ride}
+                  onBookRide={handleBookRide}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

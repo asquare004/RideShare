@@ -1,34 +1,89 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import TripCard from '../components/TripCard';
 
 function MyTrips() {
-  // Example data - replace with your actual data from backend
+  const navigate = useNavigate();
+
+  // Example data with more entries
   const upcomingRides = [
     {
       id: 1,
-      from: "San Francisco",
-      to: "Los Angeles",
+      from: "Mumbai",
+      to: "Pune",
       date: "2024-03-25",
       time: "09:00 AM",
-      price: 45,
-      driver: "John Doe",
-      seats: 2
+      price: 450,
+      seats: 2,
+      driver: {
+        name: "John Doe",
+        rating: 4.8
+      }
     },
-    // Add more upcoming rides
+    {
+      id: 2,
+      from: "Delhi",
+      to: "Agra",
+      date: "2024-03-26",
+      time: "10:30 AM",
+      price: 350,
+      seats: 1,
+      driver: {
+        name: "Mike Smith",
+        rating: 4.7
+      }
+    }
   ];
 
   const completedRides = [
     {
-      id: 2,
-      from: "Los Angeles",
-      to: "San Diego",
+      id: 3,
+      from: "Bangalore",
+      to: "Mysore",
       date: "2024-03-10",
       time: "02:00 PM",
-      price: 35,
-      driver: "Jane Smith",
-      status: "Completed"
+      price: 400,
+      seats: 2,
+      status: "Completed",
+      driver: {
+        name: "Jane Smith",
+        rating: 4.9
+      }
     },
-    // Add more completed rides
+    {
+      id: 4,
+      from: "Chennai",
+      to: "Pondicherry",
+      date: "2024-03-08",
+      time: "11:00 AM",
+      price: 380,
+      seats: 1,
+      status: "Completed",
+      driver: {
+        name: "David Wilson",
+        rating: 4.6
+      }
+    }
   ];
+
+  const handleViewDetails = (trip) => {
+    const rideData = {
+      id: trip.id,
+      source: trip.from,
+      destination: trip.to,
+      departureTime: trip.time,
+      price: trip.price,
+      availableSeats: trip.seats,
+      driver: trip.driver
+    };
+    
+    navigate('/booking-details', { 
+      state: { 
+        ride: rideData,
+        isViewOnly: true
+      } 
+    });
+  };
 
   return (
     <div className="container mx-auto px-4 pt-24">
@@ -38,27 +93,18 @@ function MyTrips() {
       <div className="mb-8">
         <h2 className="text-xl font-medium text-gray-700 mb-4">Upcoming Rides</h2>
         <div className="space-y-4">
-          {upcomingRides.map((ride) => (
-            <div key={ride.id} className="bg-white rounded-lg shadow-md p-6 border border-gray-100">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-800">
-                    {ride.from} → {ride.to}
-                  </h3>
-                  <p className="text-gray-600">
-                    {new Date(ride.date).toLocaleDateString()} at {ride.time}
-                  </p>
-                </div>
-                <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
-                  ${ride.price}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-sm text-gray-600">
-                <p>Driver: {ride.driver}</p>
-                <p>Seats booked: {ride.seats}</p>
-              </div>
-            </div>
-          ))}
+          {upcomingRides.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No upcoming rides</p>
+          ) : (
+            upcomingRides.map((trip) => (
+              <TripCard
+                key={trip.id}
+                trip={trip}
+                onViewDetails={handleViewDetails}
+                isCompleted={false}
+              />
+            ))
+          )}
         </div>
       </div>
 
@@ -66,29 +112,18 @@ function MyTrips() {
       <div>
         <h2 className="text-xl font-medium text-gray-700 mb-4">Completed Rides</h2>
         <div className="space-y-4">
-          {completedRides.map((ride) => (
-            <div key={ride.id} className="bg-gray-50 rounded-lg shadow-sm p-6 border border-gray-100">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-800">
-                    {ride.from} → {ride.to}
-                  </h3>
-                  <p className="text-gray-600">
-                    {new Date(ride.date).toLocaleDateString()} at {ride.time}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">
-                    ${ride.price}
-                  </span>
-                  <p className="text-sm text-gray-500 mt-1">Completed</p>
-                </div>
-              </div>
-              <div className="text-sm text-gray-600">
-                <p>Driver: {ride.driver}</p>
-              </div>
-            </div>
-          ))}
+          {completedRides.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No completed rides</p>
+          ) : (
+            completedRides.map((trip) => (
+              <TripCard
+                key={trip.id}
+                trip={trip}
+                onViewDetails={handleViewDetails}
+                isCompleted={true}
+              />
+            ))
+          )}
         </div>
       </div>
     </div>

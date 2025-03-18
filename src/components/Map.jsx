@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
@@ -23,6 +24,9 @@ const blueIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+function MapController({ center }) {
+  const map = useMap();
+  
 function MapController({ center }) {
   const map = useMap();
   

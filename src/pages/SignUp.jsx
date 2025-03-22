@@ -46,7 +46,7 @@ export default function SignUp() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 pt-24">
       <div className="sm:mx-auto sm:w-full sm:max-w-md mb-6">
         <h2 className="text-center text-3xl font-bold text-gray-900">
           Create your account
@@ -139,7 +139,7 @@ export default function SignUp() {
                 <div className="w-full border-t border-gray-300"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                <span className="px-2 bg-white text-gray-500">Or</span>
               </div>
             </div>
 

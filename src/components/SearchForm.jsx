@@ -22,7 +22,7 @@ function SearchForm({ onSearch }) {
           <input 
             type="text" 
             name="source"
-            placeholder="Enter source location" 
+            placeholder="Search by any part of address" 
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
@@ -33,7 +33,7 @@ function SearchForm({ onSearch }) {
           <input 
             type="text" 
             name="destination"
-            placeholder="Enter destination" 
+            placeholder="Search by any part of address" 
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
@@ -49,6 +49,15 @@ function SearchForm({ onSearch }) {
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
         </div>
+      </div>
+      
+      <div className="mt-4 text-sm text-gray-600 bg-blue-50 p-3 rounded-md">
+        <p className="flex items-center">
+          <svg className="w-4 h-4 mr-2 text-blue-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"></path>
+          </svg>
+          Results update as you type. Search for any part of the address to find matching rides.
+        </p>
       </div>
     </div>
   );

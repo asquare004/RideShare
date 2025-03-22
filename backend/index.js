@@ -29,10 +29,24 @@ app.use('/api/rides', ridesRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
 
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/rideshare')
+// MongoDB connection with improved options
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/rideshare', {
+  serverSelectionTimeoutMS: 15000, // Timeout for server selection
+  socketTimeoutMS: 45000, // Socket timeout
+  connectTimeoutMS: 30000, // Connection timeout
+  heartbeatFrequencyMS: 10000, // Regular heartbeat to keep connection alive
+  maxPoolSize: 10, // Maximum number of connections in the connection pool
+  minPoolSize: 2, // Minimum number of connections in the connection pool
+  retryWrites: true, // Retry writes if a network error happens
+})
   .then(() => console.log('Connected to MongoDB'))
-  .catch((error) => console.error('MongoDB connection error:', error));
+  .catch((error) => {
+    console.error('MongoDB connection error:', error);
+    // Log more detailed error information
+    if (error.name === 'MongoTimeoutError') {
+      console.error('Connection timeout. Check if MongoDB server is running and accessible.');
+    }
+  });
 
 // Set security headers (optional but recommended for Cross-Origin-Opener-Policy warnings)
 app.use((req, res, next) => {

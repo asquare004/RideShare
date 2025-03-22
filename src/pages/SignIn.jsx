@@ -39,7 +39,10 @@ function SignIn() {
       }
 
       if (res.ok) {
+        console.log('Cookies after sign in:', document.cookie);
+        
         dispatch(signInSuccess(data));
+        
         navigate("/");
       }
     } catch (error) {
@@ -124,7 +127,7 @@ function SignIn() {
                 <div className="w-full border-t border-gray-300"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                <span className="px-2 bg-white text-gray-500">Or</span>
               </div>
             </div>
 

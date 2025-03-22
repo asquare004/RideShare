@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { userService } from '../services/userService';
 import { useSelector } from 'react-redux';
 import { FaUser, FaStar, FaEnvelope } from 'react-icons/fa';
+import { Link } from 'react-router-dom';
 
 function Profile() {
   const [userProfile, setUserProfile] = useState({
@@ -19,23 +20,36 @@ function Profile() {
     const fetchUserProfile = async () => {
       try {
         if (!currentUser?._id) {
-          throw new Error('User not authenticated');
+          console.log("No user ID found in currentUser:", currentUser);
+          setLoading(false);
+          setError('User not authenticated or session expired');
+          return;
         }
+        
+        console.log("Fetching profile for user ID:", currentUser._id);
         const userData = await userService.getProfile(currentUser._id);
+        console.log("Profile data received:", userData);
+        
         setUserProfile({
-          username: userData.username,
-          email: userData.email,
-          profilePicture: userData.profilePicture,
+          username: userData.username || '',
+          email: userData.email || '',
+          profilePicture: userData.profilePicture || '',
           rating: userData.rating || 0
         });
         setLoading(false);
       } catch (err) {
-        setError(err.message);
+        console.error("Error fetching profile:", err);
+        setError(err.message || 'Failed to load profile');
         setLoading(false);
       }
     };
 
-    fetchUserProfile();
+    if (currentUser) {
+      fetchUserProfile();
+    } else {
+      setLoading(false);
+      setError('Please sign in to view your profile');
+    }
   }, [currentUser]);
 
   if (loading) {
@@ -53,12 +67,17 @@ function Profile() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
-          <div className="text-center text-red-600">
-            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <h3 className="mt-4 text-lg font-medium">Error Loading Profile</h3>
-            <p className="mt-2 text-sm">{error}</p>
+          <div className="text-center">
+            <div className="mb-6">
+              <FaUser className="mx-auto h-16 w-16 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-medium text-gray-900 mb-2">Profile Not Available</h3>
+            <p className="text-gray-600 mb-6">{error}</p>
+            {!currentUser && (
+              <Link to="/sign-in" className="inline-block w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-center transition duration-200">
+                Sign In
+              </Link>
+            )}
           </div>
         </div>
       </div>

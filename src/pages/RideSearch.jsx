@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getFirestore, collection, query, where, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { auth } from '../firebase/config';
-import RideCard from '../components/RideCard';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import RideCard from '../components/RideCard';
 import SearchForm from '../components/SearchForm';
+import { rideService } from '../services/rideService';
 
 function RideSearch() {
   const [rides, setRides] = useState([]);
@@ -13,86 +13,74 @@ function RideSearch() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
-  const db = getFirestore();
   const navigate = useNavigate();
+  const { currentUser } = useSelector(state => state.user);
 
-  // Update the dummy data with 2026 dates
-  const dummyRides = [
-    {
-      id: '1',
-      source: 'Mumbai',
-      destination: 'Pune',
-      departureTime: '09:00 AM',
-      date: '2026-03-25',
-      availableSeats: 3,
-      price: 450,
-      driver: {
-        name: 'John Doe',
-        rating: 4.8
-      }
-    },
-    {
-      id: '2',
-      source: 'Delhi',
-      destination: 'Agra',
-      departureTime: '10:30 AM',
-      date: '2026-03-26',
-      availableSeats: 2,
-      price: 550,
-      driver: {
-        name: 'Jane Smith',
-        rating: 4.9
-      }
-    },
-    {
-      id: '3',
-      source: 'Chicago, IL',
-      destination: 'Detroit, MI',
-      departureTime: '02:00 PM',
-      date: '2026-03-27',
-      availableSeats: 4,
-      price: 35,
-      driver: {
-        name: 'Mike Johnson',
-        rating: 4.7
-      }
-    },
-    {
-      id: '4',
-      source: 'Seattle, WA',
-      destination: 'Portland, OR',
-      departureTime: '11:00 AM',
-      date: '2026-03-25',
-      availableSeats: 3,
-      price: 40,
-      driver: {
-        name: 'Sarah Wilson',
-        rating: 4.6
-      }
-    },
-    {
-      id: '5',
-      source: 'Miami, FL',
-      destination: 'Orlando, FL',
-      departureTime: '08:30 AM',
-      date: '2026-03-26',
-      availableSeats: 2,
-      price: 50,
-      driver: {
-        name: 'David Brown',
-        rating: 4.9
-      }
-    }
-  ];
+  // Helper function to safely compare IDs that may be strings or objects
+  const isSameId = (id1, id2) => {
+    if (!id1 || !id2) return false;
+    
+    // Convert both to strings for comparison
+    const strId1 = typeof id1 === 'object' ? id1.toString() : id1;
+    const strId2 = typeof id2 === 'object' ? id2.toString() : id2;
+    
+    return strId1 === strId2;
+  }
 
-  // Replace the existing useEffect with this one for testing
+  // Fetch rides from the database
   useEffect(() => {
-    setRides(dummyRides);
-    setFilteredRides(dummyRides);
-    setLoading(false);
-  }, []);
+    const fetchRides = async () => {
+      try {
+        setLoading(true);
+        
+        // Get rides
+        const ridesData = await rideService.getRides();
+        console.log('Original rides data:', ridesData);
+        
+        // Additional filters
+        const availableRides = ridesData.filter(ride => {
+          // Filter out rides with no available seats
+          if (ride.leftSeats <= 0) {
+            console.log(`Filtering out ride ${ride._id} - no seats left`);
+            return false;
+          }
+          
+          // Filter out rides created by current user
+          if (currentUser && (
+            ride.email === currentUser.email || 
+            (ride.createdBy && isSameId(ride.createdBy, currentUser._id))
+          )) {
+            console.log(`Filtering out ride ${ride._id} - created by current user`);
+            return false;
+          }
+          
+          // Filter out rides where user is already a passenger
+          if (currentUser && ride.passengers && ride.passengers.some(passenger => 
+            (passenger.userId && isSameId(passenger.userId, currentUser._id)) ||
+            (passenger.email && passenger.email === currentUser.email)
+          )) {
+            console.log(`Filtering out ride ${ride._id} - user already joined`);
+            return false;
+          }
+          
+          return true;
+        });
+        
+        console.log('Filtered rides:', availableRides);
+        setRides(availableRides);
+        setFilteredRides(availableRides);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching rides:', err);
+        setError('Failed to load rides. Please try again later.');
+        setLoading(false);
+      }
+    };
 
-  // Update the filtering logic
+    fetchRides();
+  }, [currentUser]);
+
+  // Filter rides based on search criteria
   useEffect(() => {
     let filtered = [...rides];
 
@@ -109,16 +97,12 @@ function RideSearch() {
     }
 
     if (selectedDate) {
-      // Format selectedDate to match the format in dummyRides (YYYY-MM-DD)
       filtered = filtered.filter(ride => ride.date === selectedDate);
-      console.log('Selected Date:', selectedDate); // For debugging
-      console.log('Filtered Rides:', filtered); // For debugging
     }
 
     setFilteredRides(filtered);
   }, [source, destination, selectedDate, rides]);
 
-  // Simplify the source and destination handlers
   const handleSourceChange = (e) => {
     setSource(e.target.value);
   };
@@ -128,21 +112,27 @@ function RideSearch() {
   };
 
   const handleBookRide = (ride) => {
-    if (!auth.currentUser) {
-      setError('Please sign in to book a ride');
-      return;
-    }
-
     // Navigate to booking details page with ride information
     navigate('/booking-details', { state: { ride } });
   };
 
   // Handle search form submission
   const handleSearch = (params) => {
-    console.log('Search Params:', params); // For debugging
-    setSource(params.source);
-    setDestination(params.destination);
-    setSelectedDate(params.date);
+    setSource(params.source || '');
+    setDestination(params.destination || '');
+    setSelectedDate(params.date || '');
+  };
+
+  const formatDateTime = (date, time) => {
+    const dateObj = new Date(`${date}T${time}`);
+    return dateObj.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   return (
@@ -152,7 +142,7 @@ function RideSearch() {
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900">Find a Ride</h2>
             <p className="mt-1 text-sm text-gray-600">
-              Search for available rides and book your journey
+              Search for upcoming rides and book your journey
             </p>
           </div>
 
@@ -168,22 +158,45 @@ function RideSearch() {
 
           {/* Rides List */}
           {loading ? (
-            <div className="text-center py-4">Loading rides...</div>
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
           ) : filteredRides.length === 0 ? (
-            <div className="text-center text-gray-500 py-4">
-              {selectedDate 
-                ? `No rides found for ${new Date(selectedDate).toLocaleDateString()}`
-                : "No rides found matching your criteria"}
+            <div className="text-center text-gray-500 py-8 bg-gray-50 rounded-lg">
+              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <p className="mt-4 text-lg font-medium">
+                {selectedDate 
+                  ? `No rides found for ${new Date(selectedDate).toLocaleDateString('en-US', {month: 'long', day: 'numeric', year: 'numeric'})}`
+                  : "No available rides found matching your criteria"}
+              </p>
+              <p className="mt-2 text-sm">
+                {rides.length === 0 
+                  ? "No upcoming rides are currently available. Check back later for new rides."
+                  : source || destination || selectedDate 
+                    ? "Try adjusting your search filters or check back later for new rides."
+                    : "There are no rides available that you can join. Rides may be full, already booked by you, or created by you."}
+              </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filteredRides.map(ride => (
-                <RideCard
-                  key={ride.id}
-                  ride={ride}
-                  onBookRide={handleBookRide}
-                />
-              ))}
+            <div>
+              <p className="mb-4 text-sm text-gray-500">
+                Found {filteredRides.length} ride{filteredRides.length !== 1 ? 's' : ''} you can join
+              </p>
+              <div className="space-y-4">
+                {filteredRides.map(ride => (
+                  <RideCard
+                    key={ride._id}
+                    ride={{
+                      ...ride,
+                      // Format date and time for display
+                      formattedDateTime: formatDateTime(ride.date, ride.departureTime)
+                    }}
+                    onBookRide={handleBookRide}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>

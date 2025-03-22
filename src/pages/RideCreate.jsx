@@ -8,6 +8,22 @@ import { locationService } from '../services/locationService';
 import { rideService } from '../services/rideService';
 import { RIDE_CONSTANTS, INITIAL_MARKERS_STATE, DEFAULT_CENTER } from '../constants/ride';
 
+// Custom styles to fix z-index issues
+const mapStyles = `
+  .leaflet-map-pane, 
+  .leaflet-marker-pane, 
+  .leaflet-popup-pane, 
+  .leaflet-overlay-pane, 
+  .leaflet-shadow-pane, 
+  .leaflet-tile-pane {
+    z-index: 5 !important;
+  }
+  
+  .leaflet-control {
+    z-index: 10 !important;
+  }
+`;
+
 function RideCreate() {
   const navigate = useNavigate();
   const { currentUser } = useSelector(state => state.user);
@@ -154,26 +170,89 @@ function RideCreate() {
     setFareRange({ min: 0, max: 0 });
   };
 
+  // Add function to get min time (if today is selected, only allow future times)
+  const getMinTime = () => {
+    if (formData.date === new Date().toISOString().split('T')[0]) {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }
+    return null; // No min time for future dates
+  };
+
+  // Validate date and time
+  const validateDateTime = (date, time) => {
+    const selectedDateTime = new Date(`${date}T${time}:00`);
+    const currentDateTime = new Date();
+    
+    if (selectedDateTime <= currentDateTime) {
+      const formattedCurrent = currentDateTime.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true
+      });
+      return `Departure must be after ${formattedCurrent}`;
+    }
+    return null;
+  };
+
+  // Handle date change with validation
+  const handleDateChange = (e) => {
+    const newDate = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      date: newDate
+    }));
+    
+    // If time is also set, validate the combination
+    if (formData.departureTime) {
+      const error = validateDateTime(newDate, formData.departureTime);
+      setError(error);
+    }
+  };
+
+  // Handle time change with validation
+  const handleTimeChange = (e) => {
+    const newTime = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      departureTime: newTime
+    }));
+    
+    // If date is also set, validate the combination
+    if (formData.date) {
+      const error = validateDateTime(formData.date, newTime);
+      setError(error);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Check if user is logged in
-    if (!currentUser) {
-      setShowLoginModal(true);
-      return;
-    }
+    setIsSubmitting(true);
+    setError(null);
 
-    // Debug authentication state
-    console.log('Attempting to create ride with user:', currentUser);
-    
     try {
-      setIsSubmitting(true);
-      setError(null);
+      // Validate form data
+      if (!formData.source || !formData.sourceCord) {
+        setError('Please select a source location');
+        setIsSubmitting(false);
+        return;
+      }
 
-      // Validate required fields
-      if (!formData.source || !formData.destination || !formData.availableSeats || 
-          !formData.date || !formData.departureTime || !formData.price) {
-        setError('Please fill in all required fields');
+      if (!formData.destination || !formData.destinationCord) {
+        setError('Please select a destination location');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validate date and time
+      const dateTimeError = validateDateTime(formData.date, formData.departureTime);
+      if (dateTimeError) {
+        setError(dateTimeError);
+        setIsSubmitting(false);
         return;
       }
 
@@ -184,9 +263,33 @@ function RideCreate() {
       // Validate if the number of passengers is valid
       if (leftSeats < 0) {
         setError('Maximum 4 passengers are allowed');
+        setIsSubmitting(false);
         return;
       }
 
+      // Check if user is logged in - if not, show login modal
+      if (!currentUser) {
+        setShowLoginModal(true);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Debug authentication state
+      console.log('Attempting to create ride with user:', currentUser);
+      
+      if (!currentUser._id) {
+        console.error('User ID is missing from currentUser object');
+        setError('Authentication error: User ID is missing. Please try signing out and back in.');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Check if token is available
+      if (!currentUser.token) {
+        console.warn('Token may be missing from currentUser object');
+        // We'll still try to create the ride since we've added the interceptor and backend also checks cookies
+      }
+      
       // Prepare ride data according to backend requirements
       const rideData = {
         source: formData.source,
@@ -199,7 +302,9 @@ function RideCreate() {
         price: parseInt(formData.price),
         distance: distance,
         email: currentUser.email, // Required by backend
-          // Support both MongoDB _id and Firebase uid
+        driverId: currentUser._id || '', // Use empty string as fallback
+        maxSeats: leftSeats, // Add the maxSeats field with the same value as leftSeats
+        createdBy: currentUser._id // Add createdBy field with the current user's ID
       };
 
       console.log('Sending ride data:', rideData);
@@ -208,11 +313,28 @@ function RideCreate() {
       // Create ride in database
       await rideService.createRide(rideData);
       
-      // Navigate to ride search page
-      navigate('/');
+      // Navigate to mytrips page instead of ride search page
+      navigate('/my-trips');
     } catch (error) {
-      setError(error.message || 'Failed to create ride. Please try again.');
       console.error('Error creating ride:', error);
+      
+      // Handle authentication errors specifically
+      if (error.message && (
+          error.message.includes('not authenticated') || 
+          error.message.includes('token') || 
+          error.message.includes('auth'))) {
+        setError('Authentication error: Please sign out and sign in again to create a ride.');
+      } 
+      // Handle database timeout errors
+      else if (error.message && (
+          error.message.includes('timed out') || 
+          error.message.includes('timeout') ||
+          error.message.includes('connect to the database'))) {
+        setError('Database connection error: The server is taking too long to respond. Please try again in a few minutes.');
+      }
+      else {
+        setError(error.message || 'Failed to create ride. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -251,18 +373,21 @@ function RideCreate() {
 
   return (
     <div className="min-h-screen bg-gray-100 pt-24">
+      {/* Add styles to fix z-index issues */}
+      <style>{mapStyles}</style>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow px-5 py-6 sm:px-6">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900">Publish a New Ride</h2>
             <p className="mt-1 text-sm text-gray-600">
               Share your journey with others and split the costs
+              {!currentUser && <span className="ml-1 text-blue-600 font-medium"> • You'll need to sign in before publishing</span>}
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Map Section - Left Side */}
-            <div className="bg-white shadow-md rounded-lg p-4">
+            <div className="bg-white shadow-md rounded-lg p-4 relative" style={{ zIndex: 10 }}>
               <div className="mb-4 flex justify-between items-center">
                 <h3 className="text-lg font-semibold">Route on Map</h3>
                 <button
@@ -342,7 +467,8 @@ function RideCreate() {
                     type="date"
                     name="date"
                     value={formData.date}
-                    onChange={handleChange}
+                    onChange={handleDateChange}
+                    min={new Date().toISOString().split('T')[0]} // Set min to today's date
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
@@ -354,7 +480,8 @@ function RideCreate() {
                     type="time"
                     name="departureTime"
                     value={formData.departureTime}
-                    onChange={handleChange}
+                    onChange={handleTimeChange}
+                    min={formData.date === new Date().toISOString().split('T')[0] ? getMinTime() : null}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
@@ -437,43 +564,46 @@ function RideCreate() {
 
           {/* Login Modal */}
           {showLoginModal && (
-            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full" style={{ zIndex: 9999 }}>
-              <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white" style={{ zIndex: 10000 }}>
-                <div className="mt-3 text-center">
-                  <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                    <svg
-                      className="h-6 w-6 text-red-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg leading-6 font-medium text-gray-900 mt-4">Authentication Required</h3>
-                  <div className="mt-2 px-7 py-3">
-                    <p className="text-sm text-gray-500">
-                      Please login to create a ride
-                    </p>
-                  </div>
-                  <div className="items-center px-4 py-3">
-                    <button
-                      onClick={() => navigate('/sign-in')}
-                      className="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      Login
-                    </button>
-                    <button
-                      onClick={() => setShowLoginModal(false)}
-                      className="ml-3 px-4 py-2 bg-gray-100 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                    >
-                      Cancel
-                    </button>
+            <div className="fixed inset-0 overflow-y-auto h-full w-full" style={{ zIndex: 50000 }}>
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-50" style={{ zIndex: 50000 }}></div>
+              <div className="flex items-center justify-center min-h-screen">
+                <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white mx-auto" style={{ zIndex: 50001 }}>
+                  <div className="mt-3 text-center">
+                    <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+                      <svg 
+                        className="h-6 w-6 text-blue-600" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round" 
+                          strokeWidth="2" 
+                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" 
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 mt-4">Sign in to publish your ride</h3>
+                    <div className="mt-2 px-7 py-3">
+                      <p className="text-sm text-gray-500">
+                         Sign in to complete the process and share your journey with others.
+                      </p>
+                    </div>
+                    <div className="items-center px-4 py-3">
+                      <button
+                        onClick={() => navigate('/sign-in')}
+                        className="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        Sign In
+                      </button>
+                      <button
+                        onClick={() => setShowLoginModal(false)}
+                        className="ml-3 px-4 py-2 bg-gray-100 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

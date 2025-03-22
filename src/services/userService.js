@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { authService } from './authService';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -8,10 +7,7 @@ export const userService = {
   getProfile: async (userId) => {
     try {
       const response = await axios.get(`${API_URL}/user/${userId}`, {
-        withCredentials: true,
-        headers: {
-          'Authorization': `Bearer ${authService.getToken()}`
-        }
+        withCredentials: true
       });
       return response.data;
     } catch (error) {
@@ -23,10 +19,7 @@ export const userService = {
   updateProfile: async (userId, userData) => {
     try {
       const response = await axios.put(`${API_URL}/user/update/${userId}`, userData, {
-        withCredentials: true,
-        headers: {
-          'Authorization': `Bearer ${authService.getToken()}`
-        }
+        withCredentials: true
       });
       return response.data;
     } catch (error) {

@@ -16,29 +16,12 @@ import History from './pages/History';
 import BookingDetails from './pages/BookingDetails';
 
 function App() {
-  const [userRole, setUserRole] = useState(null);
-  const db = getFirestore();
-
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setUserRole(userDoc.data().role);
-        }
-      } else {
-        setUserRole(null);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
   return (
     <BrowserRouter>
     <div className="min-h-screen bg-gray-50">
-      {userRole === 'driver' ? <DriverNavbar /> : <Navbar />}
+    <Navbar></Navbar>
       <Routes>
+       
         <Route path='/' element={<RideSearch />} />
         <Route path='/create-ride' element={<RideCreate />} />
         <Route path='/profile' element={<Profile />} />

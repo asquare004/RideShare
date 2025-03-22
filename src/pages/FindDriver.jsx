@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 
-
-
 function FindDriver() {
-  const [timeLeft, setTimeLeft] = useState(60); // 10 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [driverAccepted, setDriverAccepted] = useState(false);
+  const [acceptedDriver, setAcceptedDriver] = useState(null);
   const [proposals, setProposals] = useState([
     // Dummy data - replace with actual API data
     {
@@ -27,13 +27,13 @@ function FindDriver() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
-    if (timeLeft > 0) {
+    if (timeLeft > 0 && !driverAccepted) {
       const timer = setInterval(() => {
         setTimeLeft(prev => prev - 1);
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [timeLeft]);
+  }, [timeLeft, driverAccepted]);
 
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
@@ -41,21 +41,16 @@ function FindDriver() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const handleAccept = (proposalId) => {
+  const handleAccept = (proposal) => {
+    setDriverAccepted(true);
+    setAcceptedDriver(proposal);
     setShowSuccessModal(true);
   };
-
-  const handleReject = (proposalId) => {
-    setProposals(proposals.filter(p => p.id !== proposalId));
-  };
-
-  // Sort proposals by total price in descending order
-  const sortedProposals = [...proposals].sort((a, b) => b.totalPrice - a.totalPrice);
 
   return (
     <div className="max-w-5xl mx-auto p-4 pt-24">
       <div className="text-center mb-8">
-        {timeLeft > 0 && (
+        {!driverAccepted && timeLeft > 0 && (
           <div className="flex flex-col items-center mt-8">
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-600 border-t-transparent mb-4"></div>
             <p className="text-gray-600">Searching for drivers...</p>
@@ -64,49 +59,72 @@ function FindDriver() {
             </div>
           </div>
         )}
+        
+        {(timeLeft === 0 || (!driverAccepted && proposals.length === 0)) && (
+          <div className="bg-yellow-100 p-6 rounded-lg shadow-md">
+            <h3 className="text-xl font-semibold text-yellow-800 mb-2">No Driver Available Currently</h3>
+            <p className="text-yellow-700">Increasing the fare might help you find a ride.</p>
+          </div>
+        )}
       </div>
 
-      <div className="grid gap-4">
-        {sortedProposals.map((proposal, index) => (
-          <motion.div
-            key={proposal.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
-            className="bg-white p-6 rounded-lg shadow-md"
+      {driverAccepted && acceptedDriver && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white p-6 rounded-lg shadow-md"
+        >
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h3 className="text-xl font-semibold">{acceptedDriver.driverName}</h3>
+              <div className="flex items-center mt-1">
+                <span className="text-yellow-400">★</span>
+                <span className="ml-1">{acceptedDriver.rating}</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-lg font-semibold">${acceptedDriver.pricePerPerson} per person</p>
+              <p className="text-xl text-blue-600 font-bold">Total: ${acceptedDriver.totalPrice}</p>
+            </div>
+          </div>
+          <p className="text-gray-600 mb-4">Car: {acceptedDriver.carName}</p>
+          <div className="bg-green-100 p-3 rounded-lg">
+            <p className="text-green-700 text-center">Driver has accepted your ride request!</p>
+          </div>
+        </motion.div>
+      )}
+
+      {!driverAccepted && proposals.map((proposal, index) => (
+        <motion.div
+          key={proposal.id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3, delay: index * 0.1 }}
+          className="bg-white p-6 rounded-lg shadow-md mb-4"
+        >
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h3 className="text-xl font-semibold">{proposal.driverName}</h3>
+              <div className="flex items-center mt-1">
+                <span className="text-yellow-400">★</span>
+                <span className="ml-1">{proposal.rating}</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-lg font-semibold">${proposal.pricePerPerson} per person</p>
+              <p className="text-xl text-blue-600 font-bold">Total: ${proposal.totalPrice}</p>
+            </div>
+          </div>
+          <p className="text-gray-600 mb-4">Car: {proposal.carName}</p>
+          <button
+            onClick={() => handleAccept(proposal)}
+            className="w-full bg-green-500 text-white py-2 rounded hover:bg-green-600"
           >
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-xl font-semibold">{proposal.driverName}</h3>
-                <div className="flex items-center mt-1">
-                  <span className="text-yellow-400">★</span>
-                  <span className="ml-1">{proposal.rating}</span>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-semibold">${proposal.pricePerPerson} per person</p>
-                <p className="text-xl text-blue-600 font-bold">Total: ${proposal.totalPrice}</p>
-              </div>
-            </div>
-            <p className="text-gray-600 mb-4">Car: {proposal.carName}</p>
-            <div className="flex gap-4">
-              <button
-                onClick={() => handleAccept(proposal.id)}
-                className="flex-1 bg-green-500 text-white py-2 rounded hover:bg-green-600"
-              >
-                Accept
-              </button>
-              <button
-                onClick={() => handleReject(proposal.id)}
-                className="flex-1 bg-red-500 text-white py-2 rounded hover:bg-red-600"
-              >
-                Reject
-              </button>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+            Accept
+          </button>
+        </motion.div>
+      ))}
 
       {showSuccessModal && (
         <motion.div
@@ -135,4 +153,4 @@ function FindDriver() {
   );
 }
 
-export default FindDriver; 
+export default FindDriver;

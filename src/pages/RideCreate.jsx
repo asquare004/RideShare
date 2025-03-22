@@ -1,20 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import Map from '../components/Map';
 import LocationInput from '../components/LocationInput';
 import { useRideForm } from '../hooks/useRideForm';
 import { locationService } from '../services/locationService';
+import { rideService } from '../services/rideService';
 import { RIDE_CONSTANTS, INITIAL_MARKERS_STATE, DEFAULT_CENTER } from '../constants/ride';
 
 function RideCreate() {
   const navigate = useNavigate();
-  const { formData, setFormData, error, handleChange } = useRideForm();
+  const { currentUser } = useSelector(state => state.user);
+  const { formData, setFormData, error, setError, handleChange } = useRideForm();
   const [markers, setMarkers] = useState(INITIAL_MARKERS_STATE);
   const [distance, setDistance] = useState(null);
   const [fareRange, setFareRange] = useState({ min: 0, max: 0 });
   const [mapCenter, setMapCenter] = useState(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [locationError, setLocationError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const getCurrentLocation = async () => {
     setIsLoadingLocation(true);
@@ -70,6 +75,9 @@ function RideCreate() {
       setIsLoadingLocation(false);
       setMapCenter(DEFAULT_CENTER);
     }
+    
+    // Add debugging for authentication
+    console.log('Current user:', currentUser);
   }, []);
 
   const handleGetLocationClick = () => {
@@ -146,11 +154,68 @@ function RideCreate() {
     setFareRange({ min: 0, max: 0 });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Add form validation here
-    console.log('Form submitted:', formData);
-    navigate('/find-driver');
+    
+    // Check if user is logged in
+    if (!currentUser) {
+      setShowLoginModal(true);
+      return;
+    }
+
+    // Debug authentication state
+    console.log('Attempting to create ride with user:', currentUser);
+    
+    try {
+      setIsSubmitting(true);
+      setError(null);
+
+      // Validate required fields
+      if (!formData.source || !formData.destination || !formData.availableSeats || 
+          !formData.date || !formData.departureTime || !formData.price) {
+        setError('Please fill in all required fields');
+        return;
+      }
+
+      // Calculate left passengers (4 - selected passengers)
+      const totalPassengers = parseInt(formData.availableSeats);
+      const leftSeats = 4 - totalPassengers;
+
+      // Validate if the number of passengers is valid
+      if (leftSeats < 0) {
+        setError('Maximum 4 passengers are allowed');
+        return;
+      }
+
+      // Prepare ride data according to backend requirements
+      const rideData = {
+        source: formData.source,
+        sourceCord: formData.sourceCord,
+        destination: formData.destination,
+        destinationCord: formData.destinationCord,
+        leftSeats: leftSeats, // Using leftSeats instead of leftPassengers to match backend model
+        date: formData.date,
+        departureTime: formData.departureTime,
+        price: parseInt(formData.price),
+        distance: distance,
+        email: currentUser.email, // Required by backend
+          // Support both MongoDB _id and Firebase uid
+      };
+
+      console.log('Sending ride data:', rideData);
+      console.log('Current cookies:', document.cookie);
+
+      // Create ride in database
+      await rideService.createRide(rideData);
+      
+      // Navigate to ride search page
+      navigate('/');
+    } catch (error) {
+      setError(error.message || 'Failed to create ride. Please try again.');
+      console.error('Error creating ride:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handlePassengerInput = (e) => {
@@ -168,18 +233,18 @@ function RideCreate() {
 
     const numValue = parseInt(value);
     
-    // Check if it's a valid number and within range
-    if (!isNaN(numValue) && numValue >= 1 && numValue <= 6) {
+    // Check if it's a valid number and within range (max 4 passengers)
+    if (!isNaN(numValue) && numValue >= 1 && numValue <= 4) {
       setFormData(prev => ({
         ...prev,
         availableSeats: value
       }));
       setError('');
-    } else if (numValue > 6) {
-      setError('One car can have maximum 6 passengers');
+    } else if (numValue > 4) {
+      setError('Maximum 4 passengers are allowed');
       setFormData(prev => ({
         ...prev,
-        availableSeats: '6'
+        availableSeats: '4'
       }));
     }
   };
@@ -350,14 +415,77 @@ function RideCreate() {
                 <div>
                   <button
                     type="submit"
-                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    disabled={isSubmitting}
+                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Publish Ride
+                    {isSubmitting ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Publishing ride...</span>
+                      </div>
+                    ) : (
+                      "Publish Ride"
+                    )}
                   </button>
                 </div>
               </form>
             </div>
           </div>
+
+          {/* Login Modal */}
+          {showLoginModal && (
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full" style={{ zIndex: 9999 }}>
+              <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white" style={{ zIndex: 10000 }}>
+                <div className="mt-3 text-center">
+                  <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                    <svg
+                      className="h-6 w-6 text-red-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg leading-6 font-medium text-gray-900 mt-4">Authentication Required</h3>
+                  <div className="mt-2 px-7 py-3">
+                    <p className="text-sm text-gray-500">
+                      Please login to create a ride
+                    </p>
+                  </div>
+                  <div className="items-center px-4 py-3">
+                    <button
+                      onClick={() => navigate('/sign-in')}
+                      className="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      Login
+                    </button>
+                    <button
+                      onClick={() => setShowLoginModal(false)}
+                      className="ml-3 px-4 py-2 bg-gray-100 text-gray-700 text-base font-medium rounded-md shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Display error message if any */}
+          {error && (
+            <div className="mt-4 p-3 rounded-md bg-red-50 text-red-700 text-sm">
+              {error}
+            </div>
+          )}
         </div>
       </div>
     </div>

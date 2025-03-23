@@ -8,6 +8,9 @@ import PaymentHistory from './pages/PaymentHistory';
 import Profile from './pages/Profile';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
+import FindPassengers from './pages/FindPassengers';
+import MyTrips from './pages/MyTrips';
+import DebugPanel from './components/DebugPanel';
 
 function App() {
   return (
@@ -16,13 +19,14 @@ function App() {
         <Navbar />
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/upcoming-trips" element={<UpcomingTrips />} />
-          <Route path="/past-trips" element={<PastTrips />} />
+          <Route path="/my-trips" element={<MyTrips />} />
+          <Route path="/find-passengers" element={<FindPassengers />} />
           <Route path="/payment-history" element={<PaymentHistory />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
+          <Route path="/sign-in" element={<SignIn />} />
+          <Route path="/sign-up" element={<SignUp />} />
         </Routes>
+        <DebugPanel />
       </div>
     </Router>
   );

@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import ridesRouter from './routes/rides.js';
 import authRouter from './routes/auth.js';
 import userRouter from './routes/user.js';
+import driverRouter from './routes/driver.js';
 import path from 'path';
 import cors from 'cors';
 
@@ -28,6 +29,7 @@ app.use(cookieParser());
 app.use('/api/rides', ridesRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
+app.use('/api/driver', driverRouter);
 
 // MongoDB connection with improved options
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/rideshare', {

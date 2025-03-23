@@ -7,7 +7,7 @@ const rideSchema = new mongoose.Schema({
   },
   sourceCord: {
     type: String,
-    required: true
+    default: ''
   },
   destination: {
     type: String,
@@ -15,12 +15,19 @@ const rideSchema = new mongoose.Schema({
   },
   destinationCord: {
     type: String,
-    required: true
+    default: ''
+  },
+  totalSeats: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 4,
+    default: 4
   },
   leftSeats: {
     type: Number,
     required: true,
-    min: 1,
+    min: 0,
     max: 4
   },
   distance: {
@@ -29,12 +36,8 @@ const rideSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'completed', 'cancelled'],
-    default: 'pending'
-  },
-  email: {
-    type: String,
-    required: true
+    enum: ['scheduled', 'pending', 'completed', 'cancelled'],
+    default: 'scheduled'
   },
   date: {
     type: String,
@@ -52,27 +55,17 @@ const rideSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  driverId: {
-    type: String,
-    default: ""
-  },
-  createdBy: {
+  driver: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Driver',
     required: true
   },
   passengers: [{
-    userId: {
+    user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     },
-    name: {
-      type: String
-    },
-    email: {
-      type: String
-    },
-    bookedSeats: {
+    seats: {
       type: Number,
       default: 1,
       min: 1
@@ -83,36 +76,79 @@ const rideSchema = new mongoose.Schema({
     },
     status: {
       type: String,
-      enum: ['confirmed', 'cancelled'],
-      default: 'confirmed'
+      enum: ['pending', 'confirmed', 'cancelled', 'rejected'],
+      default: 'pending'
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'completed', 'refunded'],
+      default: 'pending'
+    },
+    paymentId: {
+      type: String,
+      default: ''
     }
   }],
-  totalBookedSeats: {
-    type: Number,
+  route: {
+    type: {
+      type: String,
+      default: 'LineString'
+    },
+    coordinates: {
+      type: Array,
+      default: []
+    }
+  },
+  estimatedDuration: {
+    type: Number, // in minutes
     default: 0
   },
-  maxSeats: {
-    type: Number,
-    default: 4,
-    min: 1,
-    max: 4
+  actualDepartureTime: {
+    type: Date
+  },
+  actualArrivalTime: {
+    type: Date
+  },
+  vehicleDetails: {
+    model: String,
+    color: String,
+    licensePlate: String
   }
 });
 
+// Virtual for available seats
 rideSchema.virtual('availableSeats').get(function() {
-  return this.maxSeats - this.totalBookedSeats;
+  return this.leftSeats;
 });
 
+// Pre-save hook to calculate leftSeats and update status
 rideSchema.pre('save', function(next) {
-  if (this.passengers) {
+  // Calculate confirmed passengers
+  if (this.passengers && this.passengers.length > 0) {
     const confirmedBookings = this.passengers
       .filter(passenger => passenger.status === 'confirmed')
-      .reduce((total, passenger) => total + passenger.bookedSeats, 0);
+      .reduce((total, passenger) => total + passenger.seats, 0);
     
-    this.totalBookedSeats = confirmedBookings;
-    this.leftSeats = this.maxSeats - confirmedBookings;
+    this.leftSeats = this.totalSeats - confirmedBookings;
+  } else {
+    this.leftSeats = this.totalSeats;
   }
+
+  // Auto-update status to completed for past rides
+  const currentDate = new Date();
+  const rideDate = new Date(`${this.date}T${this.departureTime}`);
+  
+  // If ride date is in the past and status is still scheduled/pending, mark as completed
+  if (rideDate < currentDate && ['scheduled', 'pending'].includes(this.status)) {
+    this.status = 'completed';
+  }
+  
   next();
 });
+
+// Index for efficient querying
+rideSchema.index({ driver: 1, date: 1 });
+rideSchema.index({ status: 1 });
+rideSchema.index({ 'passengers.user': 1 });
 
 export default mongoose.model('Ride', rideSchema);

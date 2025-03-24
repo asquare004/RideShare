@@ -1,4 +1,5 @@
 import Ride from '../models/Ride.js';
+import Driver from '../models/Driver.js';
 import { errorHandler } from '../utils/error.js';
 import mongoose from 'mongoose';
 
@@ -16,7 +17,8 @@ export const createRide = async (req, res, next) => {
       departureTime,
       price,
       driverId,
-      createdBy
+      createdBy,
+      passengers
     } = req.body;
 
     if (!source || !sourceCord || !destination || !destinationCord || 
@@ -34,6 +36,7 @@ export const createRide = async (req, res, next) => {
 
     console.log('User from token:', req.user);
     console.log('CreatedBy from request body:', createdBy);
+    console.log('Passengers from request body:', passengers);
 
     const newRide = new Ride({
       source,
@@ -50,7 +53,9 @@ export const createRide = async (req, res, next) => {
       status: 'pending',
       // Use createdBy from body if present, otherwise use req.user._id
       createdBy: createdBy || (req.user ? req.user._id : undefined),
-      maxSeats: leftSeats
+      totalSeats: 4,
+      // Include passengers array if provided in request
+      passengers: passengers || []
     });
 
     // Set a timeout for the database operation
@@ -83,13 +88,22 @@ export const createRide = async (req, res, next) => {
 
 export const getRides = async (req, res, next) => {
   try {
-    const { source, destination, date, limit = 10, startIndex = 0, email } = req.query;
+    const { source, destination, date, limit = 10, startIndex = 0, email, status } = req.query;
     
     // Get current date and time
     const today = new Date();
     
     // Base filter to only include upcoming rides
     let filter = {};
+    
+    // Filter by status if provided, otherwise only show pending rides for the main listing
+    if (status) {
+      filter.status = status;
+    } else if (req.path === '/' && !email) {
+      // If on the main ride listing and not filtering by user email,
+      // only show pending rides (available for acceptance)
+      filter.status = 'pending';
+    }
     
     // Add source, destination filters if provided
     if (source) filter.source = { $regex: source, $options: 'i' };
@@ -105,6 +119,8 @@ export const getRides = async (req, res, next) => {
         { 'passengers.email': email } // Rides where user is a passenger
       ];
     }
+
+    console.log('Ride filter:', filter);
     
     // Get all rides that match the filters
     const allRides = await Ride.find(filter);
@@ -159,6 +175,28 @@ export const deleteRide = async (req, res, next) => {
     await Ride.findByIdAndDelete(req.params.rideId);
     res.status(200).json('The ride has been deleted');
   } catch (error) {
+    next(error);
+  }
+};
+
+// Get a single ride by ID
+export const getRideById = async (req, res, next) => {
+  try {
+    const { rideId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(rideId)) {
+      return next(errorHandler(400, 'Invalid ride ID format'));
+    }
+    
+    const ride = await Ride.findById(rideId);
+    
+    if (!ride) {
+      return next(errorHandler(404, 'Ride not found'));
+    }
+    
+    res.status(200).json(ride);
+  } catch (error) {
+    console.error('Error fetching ride by ID:', error);
     next(error);
   }
 };
@@ -367,6 +405,175 @@ export const cancelBooking = async (req, res, next) => {
       ride
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+// Check if a driver has accepted a pending ride
+export const getPendingRideStatus = async (req, res, next) => {
+  try {
+    const { rideId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(rideId)) {
+      return next(errorHandler(400, 'Invalid ride ID'));
+    }
+    
+    const ride = await Ride.findById(rideId)
+      .populate('driverId', 'firstName lastName email phoneNumber vehicleModel vehicleYear licensePlate profilePicture rating totalTrips');
+      
+    if (!ride) {
+      return next(errorHandler(404, 'Ride not found'));
+    }
+    
+    // Check if the ride is still in pending status
+    if (ride.status === 'pending') {
+      return res.status(200).json({ 
+        status: 'pending',
+        message: 'Still looking for a driver' 
+      });
+    }
+    
+    // Check if ride has been accepted by a driver
+    if (ride.status === 'scheduled' && ride.driverId) {
+      return res.status(200).json({
+        status: 'accepted',
+        message: 'A driver has accepted your ride',
+        driver: ride.driverId,
+        ride: {
+          _id: ride._id,
+          source: ride.source,
+          destination: ride.destination,
+          date: ride.date,
+          departureTime: ride.departureTime,
+          price: ride.price,
+          distance: ride.distance,
+          leftSeats: ride.leftSeats
+        }
+      });
+    }
+    
+    // Handle canceled or other status
+    return res.status(200).json({
+      status: ride.status,
+      message: `Ride is ${ride.status}`
+    });
+    
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Cancel a pending ride that has not been accepted by any driver
+export const cancelPendingRide = async (req, res, next) => {
+  try {
+    const { rideId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(rideId)) {
+      return next(errorHandler(400, 'Invalid ride ID'));
+    }
+    
+    const ride = await Ride.findById(rideId);
+    
+    if (!ride) {
+      return next(errorHandler(404, 'Ride not found'));
+    }
+    
+    // Only pending rides can be canceled this way
+    if (ride.status !== 'pending') {
+      return next(errorHandler(400, 'Only pending rides can be canceled with this operation'));
+    }
+    
+    // Update ride status to cancelled
+    ride.status = 'cancelled';
+    await ride.save();
+    
+    res.status(200).json({
+      status: 'cancelled',
+      message: 'Ride has been cancelled successfully'
+    });
+    
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Accept a ride as a driver
+export const acceptRideAsDriver = async (req, res, next) => {
+  try {
+    const { rideId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(rideId)) {
+      return next(errorHandler(400, 'Invalid ride ID'));
+    }
+    
+    // Get the driver's ID from the verified token
+    // The verifyDriver middleware sets req.driver, but also keeps req.user for backward compatibility
+    const driverId = req.driver ? req.driver.id : req.user._id;
+    
+    console.log('Driver accepting ride:', { rideId, driverId, user: req.user, driver: req.driver });
+    
+    // Find the driver to ensure they exist and are authorized
+    const driver = await Driver.findById(driverId);
+    if (!driver) {
+      return next(errorHandler(404, 'Driver account not found'));
+    }
+    
+    // Find the ride
+    const ride = await Ride.findById(rideId);
+    if (!ride) {
+      return next(errorHandler(404, 'Ride not found'));
+    }
+    
+    console.log('Found ride before update:', {
+      id: ride._id,
+      status: ride.status,
+      driverId: ride.driverId,
+      driver: ride.driver
+    });
+    
+    // Check if the ride is still pending
+    if (ride.status !== 'pending') {
+      return next(errorHandler(400, 'This ride is no longer available for acceptance'));
+    }
+    
+    // Update the ride with driver info and change status
+    ride.driverId = driverId;
+    ride.driver = driverId; // Set both fields for backward compatibility
+    ride.status = 'scheduled';
+    
+    await ride.save();
+    
+    console.log('Updated ride after save:', {
+      id: ride._id,
+      status: ride.status,
+      driverId: ride.driverId
+    });
+    
+    res.status(200).json({
+      status: 'accepted',
+      message: 'You have successfully accepted this ride',
+      ride: {
+        _id: ride._id,
+        source: ride.source,
+        destination: ride.destination,
+        date: ride.date,
+        departureTime: ride.departureTime,
+        price: ride.price,
+        distance: ride.distance,
+        leftSeats: ride.leftSeats
+      }
+    });
+  } catch (error) {
+    console.error('Error in acceptRideAsDriver:', error);
+    
+    if (error.name === 'CastError') {
+      return next(errorHandler(400, 'Invalid ID format'));
+    } else if (error.name === 'ValidationError') {
+      return next(errorHandler(400, 'Validation failed: ' + error.message));
+    } else if (error.code === 11000) {
+      return next(errorHandler(400, 'Duplicate key error'));
+    }
+    
     next(error);
   }
 };

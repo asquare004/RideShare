@@ -7,6 +7,9 @@ import RideSearch from './pages/RideSearch';
 import RideCreate from './pages/RideCreate';
 import Profile from './pages/Profile';
 import FindDriver from './pages/FindDriver';
+import FindingDriver from './pages/FindingDriver';
+import RideConfirmation from './pages/RideConfirmation';
+import RideDetail from './pages/RideDetail';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
@@ -14,6 +17,8 @@ import MyTrips from './pages/MyTrips';
 import UpcomingTrips from './pages/UpcomingTrips';
 import History from './pages/History';
 import BookingDetails from './pages/BookingDetails';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   return (
@@ -31,10 +36,14 @@ function App() {
         <Route path='/sign-up' element={<SignUp />} />
         <Route path='/my-trips' element={<MyTrips />} />
         <Route path='/find-driver' element={<FindDriver />} />
+        <Route path='/finding-driver/:rideId' element={<FindingDriver />} />
+        <Route path='/ride-confirmation' element={<RideConfirmation />} />
+        <Route path='/ride/:rideId' element={<RideDetail />} />
         <Route path='/upcoming-trips' element={<UpcomingTrips />} />
         <Route path='/history' element={<History />} />
         <Route path='/booking-details' element={<BookingDetails />} />
       </Routes>
+      <ToastContainer position="bottom-right" autoClose={5000} />
     </div>
     </BrowserRouter>
   );

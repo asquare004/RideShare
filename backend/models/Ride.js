@@ -19,9 +19,6 @@ const rideSchema = new mongoose.Schema({
   },
   totalSeats: {
     type: Number,
-    required: true,
-    min: 1,
-    max: 4,
     default: 4
   },
   leftSeats: {
@@ -55,7 +52,7 @@ const rideSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  driver: {
+  driverId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Driver',
     required: true
@@ -70,45 +67,12 @@ const rideSchema = new mongoose.Schema({
       default: 1,
       min: 1
     },
-    bookingDate: {
-      type: Date,
-      default: Date.now
-    },
     status: {
       type: String,
       enum: ['pending', 'confirmed', 'cancelled', 'rejected'],
       default: 'pending'
     },
-    paymentStatus: {
-      type: String,
-      enum: ['pending', 'completed', 'refunded'],
-      default: 'pending'
-    },
-    paymentId: {
-      type: String,
-      default: ''
-    }
   }],
-  route: {
-    type: {
-      type: String,
-      default: 'LineString'
-    },
-    coordinates: {
-      type: Array,
-      default: []
-    }
-  },
-  estimatedDuration: {
-    type: Number, // in minutes
-    default: 0
-  },
-  actualDepartureTime: {
-    type: Date
-  },
-  actualArrivalTime: {
-    type: Date
-  },
   vehicleDetails: {
     model: String,
     color: String,
@@ -123,15 +87,36 @@ rideSchema.virtual('availableSeats').get(function() {
 
 // Pre-save hook to calculate leftSeats and update status
 rideSchema.pre('save', function(next) {
+  // If this is a new ride, add the creator as a confirmed passenger
+  if (this.isNew && this.createdBy) {
+    // Check if creator is not already in passengers list
+    const creatorExists = this.passengers.some(p => 
+      (p.user && p.user.toString() === this.createdBy.toString()) ||
+      (p.user && p.user === this.createdBy)
+    );
+    
+    if (!creatorExists) {
+      console.log('Adding creator as passenger:', this.createdBy);
+      this.passengers.push({
+        user: this.createdBy,
+        seats: 1,
+        status: 'confirmed'
+      });
+    }
+  }
+
   // Calculate confirmed passengers
   if (this.passengers && this.passengers.length > 0) {
+    console.log('Calculating confirmed bookings. Passengers:', this.passengers);
     const confirmedBookings = this.passengers
       .filter(passenger => passenger.status === 'confirmed')
       .reduce((total, passenger) => total + passenger.seats, 0);
     
-    this.leftSeats = this.totalSeats - confirmedBookings;
-  } else {
-    this.leftSeats = this.totalSeats;
+    // Only update leftSeats if there are confirmed bookings
+    if (confirmedBookings > 0) {
+      this.leftSeats = this.totalSeats - confirmedBookings;
+      console.log('Updated leftSeats:', this.leftSeats);
+    }
   }
 
   // Auto-update status to completed for past rides
@@ -141,6 +126,13 @@ rideSchema.pre('save', function(next) {
   // If ride date is in the past and status is still scheduled/pending, mark as completed
   if (rideDate < currentDate && ['scheduled', 'pending'].includes(this.status)) {
     this.status = 'completed';
+  }
+  
+  // Make sure driver field is always set to the same value as driverId
+  if (this.driver && !this.driverId) {
+    this.driverId = this.driver;
+  } else if (this.driverId && !this.driver) {
+    this.driver = this.driverId;
   }
   
   next();

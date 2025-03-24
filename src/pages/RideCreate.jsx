@@ -258,7 +258,11 @@ function RideCreate() {
 
       // Calculate left passengers (4 - selected passengers)
       const totalPassengers = parseInt(formData.availableSeats);
+      console.log('Total passengers selected by user:', totalPassengers);
+      
+      // Calculate leftSeats correctly
       const leftSeats = 4 - totalPassengers;
+      console.log('Calculated leftSeats:', leftSeats);
 
       // Validate if the number of passengers is valid
       if (leftSeats < 0) {
@@ -287,34 +291,40 @@ function RideCreate() {
       // Check if token is available
       if (!currentUser.token) {
         console.warn('Token may be missing from currentUser object');
-        // We'll still try to create the ride since we've added the interceptor and backend also checks cookies
       }
-      
+
       // Prepare ride data according to backend requirements
       const rideData = {
         source: formData.source,
         sourceCord: formData.sourceCord,
         destination: formData.destination,
         destinationCord: formData.destinationCord,
-        leftSeats: leftSeats, // Using leftSeats instead of leftPassengers to match backend model
+        leftSeats: leftSeats, // Use the correctly calculated leftSeats value
+        availableSeats: totalPassengers, // Add the number of seats the user selected
         date: formData.date,
         departureTime: formData.departureTime,
         price: parseInt(formData.price),
         distance: distance,
-        email: currentUser.email, // Required by backend
-        driverId: currentUser._id || '', // Use empty string as fallback
-        maxSeats: leftSeats, // Add the maxSeats field with the same value as leftSeats
-        createdBy: currentUser._id // Add createdBy field with the current user's ID
+        email: currentUser.email,
+        driverId: currentUser._id || '',
+        totalSeats: 4, // Total seats in a car is always 4
+        createdBy: currentUser._id,
+        // Add the current user as a passenger
+        passengers: [{
+          user: currentUser._id,
+          seats: totalPassengers,
+          status: 'confirmed'
+        }]
       };
 
       console.log('Sending ride data:', rideData);
       console.log('Current cookies:', document.cookie);
 
       // Create ride in database
-      await rideService.createRide(rideData);
+      const response = await rideService.createRide(rideData);
       
-      // Navigate to mytrips page instead of ride search page
-      navigate('/my-trips');
+      // Navigate to the finding driver page with the ride ID
+      navigate(`/finding-driver/${response._id}`);
     } catch (error) {
       console.error('Error creating ride:', error);
       
@@ -359,14 +369,14 @@ function RideCreate() {
     if (!isNaN(numValue) && numValue >= 1 && numValue <= 4) {
       setFormData(prev => ({
         ...prev,
-        availableSeats: value
+        availableSeats: numValue
       }));
       setError('');
     } else if (numValue > 4) {
       setError('Maximum 4 passengers are allowed');
       setFormData(prev => ({
         ...prev,
-        availableSeats: '4'
+        availableSeats:4
       }));
     }
   };
@@ -496,9 +506,9 @@ function RideCreate() {
                     onChange={handlePassengerInput}
                     onKeyDown={(e) => {
                       // Prevent the up arrow from incrementing beyond 6
-                      if (e.key === 'ArrowUp' && parseInt(formData.availableSeats) >= 6) {
+                      if (e.key === 'ArrowUp' && parseInt(formData.availableSeats) >= 4) {
                         e.preventDefault();
-                        setError('One car can have maximum 6 passengers');
+                        setError('One car can have maximum 4 passengers');
                       }
                       // Allow backspace and delete
                       if (e.key === 'Backspace' || e.key === 'Delete') {

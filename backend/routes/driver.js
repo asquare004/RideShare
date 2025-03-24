@@ -6,7 +6,9 @@ import {
   cancelTrip,
   createRideOffering,
   getPassengerRequests,
-  respondToPassengerRequest
+  respondToPassengerRequest,
+  getDriverUpcomingTrips,
+  getDriverPastTrips
 } from '../controllers/driverTrips.js';
 import { getDriverProfile, updateDriverProfile, proxyImage } from '../controllers/driverProfile.js';
 import { verifyToken, verifyDriver, verifyDriverToken, checkDriverAuth } from '../utils/verifyUser.js';
@@ -72,5 +74,10 @@ router.get('/session-info', getSessionInfo);
 
 // Image proxy endpoint (does not require authentication)
 router.post('/proxy-image', proxyImage);
+
+// New routes for getting driver trips (upcoming and past)
+router.get('/trips/upcoming', verifyDriver, getDriverUpcomingTrips);
+router.get('/trips/past', verifyDriver, getDriverPastTrips);
+router.post('/trips/cancel/:tripId', verifyDriver, cancelTrip);
 
 export default router; 

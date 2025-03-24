@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import ridesRouter from './routes/rides.js';
+import userRidesRouter from './routes/userRides.js';
 import authRouter from './routes/auth.js';
 import userRouter from './routes/user.js';
 import driverRouter from './routes/driver.js';
@@ -27,6 +28,7 @@ app.use(cookieParser());
 
 // Routes
 app.use('/api/rides', ridesRouter);
+app.use('/api/user-rides', userRidesRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
 app.use('/api/driver', driverRouter);

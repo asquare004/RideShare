@@ -17,7 +17,7 @@ function MyTrips() {
 
   useEffect(() => {
     const fetchUserTrips = async () => {
-      if (!currentUser) {
+      if (!currentUser || !currentUser._id) {
         setShowLoginModal(true);
         setLoading(false);
         return;
@@ -25,84 +25,98 @@ function MyTrips() {
 
       try {
         setLoading(true);
+        setError(null); // Clear any previous errors
         
-        // Get rides from the database
-        const userRides = await rideService.getRides({ email: currentUser.email });
+        // Get all rides for the user (both created and joined)
+        const response = await rideService.getUserRides();
+        console.log('Received response:', response);
+        
+        if (!response.success) {
+          throw new Error(response.message || 'Failed to fetch rides');
+        }
+        
+        const rides = response.rides || [];
+        console.log('Processing rides:', rides.length, 'Current user:', currentUser);
         
         // Current date for comparison
         const currentDate = new Date();
         
-        // Categorize rides: created by user vs joined by user
-        const created = [];
-        const joined = [];
-        
-        userRides.forEach(ride => {
-          // Check if user is the creator of the ride
-          const isCreator = ride.email === currentUser.email || 
-                           (ride.createdBy && 
-                            (ride.createdBy === currentUser._id || 
-                             ride.createdBy.toString() === currentUser._id.toString()));
+        // Format rides
+        const formattedRides = rides.map(ride => {
+          // Use the userRole information from the backend
+          const { isDriver, isPassenger, bookedSeats } = ride.userRole || {};
+
+          console.log('Processing ride:', {
+            id: ride._id,
+            isDriver,
+            isPassenger,
+            status: ride.status,
+            date: ride.date,
+            time: ride.departureTime
+          });
           
-          // Check if user is a passenger
-          const isPassenger = ride.passengers && 
-                              ride.passengers.some(p => 
-                                (p.email === currentUser.email || 
-                                 (p.userId && p.userId.toString() === currentUser._id.toString())) && 
-                                p.status === 'confirmed');
-          
-          // Create a trip object with consistent format
-          const tripData = {
+          return {
             id: ride._id,
             from: ride.source,
             to: ride.destination,
             date: ride.date,
             time: ride.departureTime,
             price: ride.price,
-            seats: isCreator ? ride.leftSeats : 
-                   (isPassenger ? ride.passengers.find(p => p.email === currentUser.email).bookedSeats : 0),
+            seats: bookedSeats || ride.leftSeats,
             distance: ride.distance,
             driver: {
-              name: isCreator ? 'You' : (ride.driverName || 'Driver'),
-              rating: ride.driverRating || '4.8'
+              name: isDriver ? 'You' : (ride.driverInfo ? `${ride.driverInfo.firstName} ${ride.driverInfo.lastName}` : 'Driver'),
+              rating: isDriver ? (currentUser.rating || '4.8') : (ride.driverInfo ? ride.driverInfo.rating : '4.8')
             },
-            isCreator: isCreator,
-            isPassenger: isPassenger
+            driverInfo: ride.driverInfo,
+            isCreator: isDriver,
+            isPassenger,
+            status: ride.status,
+            totalSeats: ride.totalSeats || 4,
+            leftSeats: ride.leftSeats
           };
-          
-          if (isCreator) {
-            created.push(tripData);
-          } else if (isPassenger) {
-            joined.push(tripData);
-          }
         });
         
-        setCreatedRides(created);
-        setJoinedRides(joined);
+        console.log('Formatted rides:', formattedRides.length);
         
         // Split rides into upcoming and completed
         const upcoming = [];
         const completed = [];
         
-        [...created, ...joined].forEach(trip => {
+        formattedRides.forEach(trip => {
           const rideDateTime = new Date(`${trip.date}T${trip.time}`);
           
           if (rideDateTime > currentDate) {
-            upcoming.push(trip);
+            // For upcoming rides, include all non-cancelled rides
+            if (trip.status !== 'cancelled') {
+              console.log('Adding upcoming ride:', trip.id);
+              upcoming.push(trip);
+            }
           } else {
-            completed.push({...trip, status: 'Completed'});
+            // For past rides, mark as completed
+            console.log('Adding completed ride:', trip.id);
+            completed.push({...trip, status: 'completed'});
           }
         });
         
-        // Sort by date (newest first for upcoming, latest first for completed)
+        // Sort by date
         upcoming.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
         completed.sort((a, b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
         
+        console.log('Upcoming rides:', upcoming.length);
+        console.log('Completed rides:', completed.length);
+        
         setUpcomingRides(upcoming);
         setCompletedRides(completed);
+        
+        // Set stats - only count non-cancelled rides
+        setCreatedRides(formattedRides.filter(r => r.isCreator && r.status !== 'cancelled'));
+        setJoinedRides(formattedRides.filter(r => r.isPassenger && r.status !== 'cancelled'));
+        
         setLoading(false);
       } catch (err) {
         console.error('Error fetching trips:', err);
-        setError('Failed to load your trips. Please try again later.');
+        setError(err.response?.data?.message || 'Failed to load your trips. Please try again later.');
         setLoading(false);
       }
     };
@@ -232,6 +246,15 @@ function MyTrips() {
           {error}
         </div>
       )}
+      
+      <div className="mb-6 border-b border-gray-200 pb-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-gray-900">All Trips</h2>
+        </div>
+        <p className="mt-1 text-sm text-gray-600">
+          View and manage all your trips
+        </p>
+      </div>
       
       {/* Upcoming Rides Section */}
       <div className="mb-8">

@@ -12,11 +12,11 @@ function Navbar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
-  const navigation = [
-    { name: 'My Trips', href: '/my-trips' },
-    { name: 'Find Passengers', href: '/find-passengers' },
-    { name: 'Payment History', href: '/payment-history' },
-    { name: 'Profile', href: '/profile' },
+  const navigationItems = [
+    { name: 'Home', path: '/' },
+    { name: 'My Trips', path: '/my-trips' },
+    { name: 'Find Passengers', path: '/find-passengers' },
+    { name: 'Payment History', path: '/payment-history' },
   ];
 
   const openSignOutModal = () => {
@@ -59,10 +59,10 @@ function Navbar() {
 
             {/* Desktop Navigation */}
             <div className="hidden sm:flex sm:items-center sm:space-x-4">
-              {navigation.map((item) => (
+              {navigationItems.map((item) => (
                 <Link
                   key={item.name}
-                  to={item.href}
+                  to={item.path}
                   className="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
                 >
                   {item.name}
@@ -112,10 +112,10 @@ function Navbar() {
             className="sm:hidden"
           >
             <div className="pt-2 pb-3 space-y-1">
-              {navigation.map((item) => (
+              {navigationItems.map((item) => (
                 <Link
                   key={item.name}
-                  to={item.href}
+                  to={item.path}
                   className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50"
                   onClick={() => setIsOpen(false)}
                 >

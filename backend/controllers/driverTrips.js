@@ -2,6 +2,90 @@ import Driver from '../models/Driver.js';
 import Ride from '../models/Ride.js';
 import { errorHandler } from '../utils/error.js';
 
+// Get upcoming trips for the current driver (authenticated user)
+export const getDriverUpcomingTrips = async (req, res, next) => {
+  try {
+    const driverId = req.driver.id;
+    console.log('Getting upcoming trips for driver ID:', driverId);
+
+    const currentDate = new Date();
+    console.log('Current date for filtering:', currentDate.toISOString());
+    
+    // Check for rides with either driver or driverId field
+    const allDriverRides = await Ride.find({
+      $or: [
+        { driverId: driverId },
+        { driver: driverId }
+      ]
+    });
+    
+    console.log('All rides for this driver:', allDriverRides.length, allDriverRides.map(r => ({
+      id: r._id,
+      status: r.status,
+      driverId: r.driverId,
+      driver: r.driver,
+      date: r.date,
+      departureTime: r.departureTime
+    })));
+    
+    const upcomingRides = await Ride.find({
+      $or: [
+        { driverId: driverId },
+        { driver: driverId }
+      ],
+      status: 'scheduled',
+      $or: [
+        { date: { $gt: currentDate.toISOString().split('T')[0] } },
+        { 
+          date: currentDate.toISOString().split('T')[0],
+          departureTime: { $gte: currentDate.toTimeString().substring(0, 5) }
+        }
+      ]
+    }).sort({ date: 1, departureTime: 1 });
+    
+    console.log(`Found ${upcomingRides.length} upcoming trips for driver:`, upcomingRides);
+    res.status(200).json(upcomingRides);
+  } catch (error) {
+    console.error('Error getting upcoming trips:', error);
+    next(error);
+  }
+};
+
+// Get past trips for the current driver (authenticated user)
+export const getDriverPastTrips = async (req, res, next) => {
+  try {
+    const driverId = req.driver.id;
+    console.log('Getting past trips for driver ID:', driverId);
+
+    const currentDate = new Date();
+    
+    const pastRides = await Ride.find({
+      $or: [
+        { driverId: driverId },
+        { driver: driverId }
+      ],
+      $or: [
+        { 
+          date: { $lt: currentDate.toISOString().split('T')[0] } 
+        },
+        { 
+          date: currentDate.toISOString().split('T')[0],
+          departureTime: { $lt: currentDate.toTimeString().substring(0, 5) }
+        },
+        {
+          status: 'completed'
+        }
+      ]
+    }).sort({ date: -1, departureTime: -1 });
+    
+    console.log(`Found ${pastRides.length} past trips for driver:`, pastRides);
+    res.status(200).json(pastRides);
+  } catch (error) {
+    console.error('Error getting past trips:', error);
+    next(error);
+  }
+};
+
 // Get upcoming trips for a driver
 export const getUpcomingTrips = async (req, res, next) => {
   try {
@@ -12,7 +96,7 @@ export const getUpcomingTrips = async (req, res, next) => {
     const currentDate = new Date();
     
     const upcomingRides = await Ride.find({
-      driver: req.params.driverId,
+      driverId: req.params.driverId,
       date: { $gte: currentDate.toISOString().split('T')[0] },
       status: { $in: ['scheduled', 'pending'] }
     }).sort({ date: 1, departureTime: 1 });
@@ -33,7 +117,7 @@ export const getPastTrips = async (req, res, next) => {
     const currentDate = new Date();
     
     const pastRides = await Ride.find({
-      driver: req.params.driverId,
+      driverId: req.params.driverId,
       $or: [
         { date: { $lt: currentDate.toISOString().split('T')[0] } },
         { 
@@ -58,7 +142,9 @@ export const cancelTrip = async (req, res, next) => {
       return next(errorHandler(404, 'Ride not found'));
     }
     
-    if (ride.driver.toString() !== req.driver.id) {
+    const rideDriverId = ride.driverId ? ride.driverId.toString() : (ride.driver ? ride.driver.toString() : null);
+    
+    if (rideDriverId !== req.driver.id) {
       return next(errorHandler(403, 'You can only cancel your own rides'));
     }
     
@@ -96,7 +182,7 @@ export const createRideOffering = async (req, res, next) => {
     
     // Create new ride
     const newRide = new Ride({
-      driver: req.driver.id,
+      driverId: req.driver.id,
       source,
       destination,
       date,
@@ -127,7 +213,10 @@ export const getPassengerRequests = async (req, res, next) => {
   try {
     // Find rides where the driver is the current user and there are pending passenger requests
     const rides = await Ride.find({
-      driver: req.driver.id,
+      $or: [
+        { driverId: req.driver.id },
+        { driver: req.driver.id }
+      ],
       'passengers.status': 'pending'
     }).populate('passengers.user', 'username profilePicture'); // Populate basic user info
     
@@ -179,7 +268,9 @@ export const respondToPassengerRequest = async (req, res, next) => {
       return next(errorHandler(404, 'Ride not found'));
     }
     
-    if (ride.driver.toString() !== req.driver.id) {
+    const rideDriverId = ride.driverId ? ride.driverId.toString() : (ride.driver ? ride.driver.toString() : null);
+    
+    if (rideDriverId !== req.driver.id) {
       return next(errorHandler(403, 'You can only respond to requests for your own rides'));
     }
     

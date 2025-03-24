@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 
 function MyTrips() {
   const [trips, setTrips] = useState([]);
@@ -22,11 +23,15 @@ function MyTrips() {
   const fetchTrips = async () => {
     setLoading(true);
     try {
-      const endpoint = activeTab === 'upcoming' ? '/api/trips/upcoming' : '/api/trips/past';
+      const endpoint = activeTab === 'upcoming' 
+        ? '/api/driver/trips/upcoming' 
+        : '/api/driver/trips/past';
+      
+      console.log(`Fetching trips from: ${endpoint}`);
+      
       const response = await fetch(endpoint, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentUser?.token}`
         },
         credentials: 'include'
       });
@@ -36,6 +41,7 @@ function MyTrips() {
       }
 
       const data = await response.json();
+      console.log(`Received ${data.length} ${activeTab} trips:`, data);
       setTrips(data);
     } catch (err) {
       console.error(`Error fetching ${activeTab} trips:`, err);
@@ -59,27 +65,27 @@ function MyTrips() {
 
   const cancelTrip = async (tripId) => {
     try {
-      const response = await fetch(`/api/trips/cancel/${tripId}`, {
+      const response = await fetch(`/api/driver/trips/cancel/${tripId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentUser?.token}`
         },
         credentials: 'include'
       });
 
       if (!response.ok) {
-        throw new Error('Failed to cancel trip');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to cancel trip');
       }
 
       // Remove the canceled trip from the list
       setTrips(trips.filter(trip => trip._id !== tripId));
       
       // Show success message
-      alert('Trip canceled successfully');
+      toast.success('Trip canceled successfully');
     } catch (err) {
       console.error('Error canceling trip:', err);
-      alert('Failed to cancel trip. Please try again.');
+      toast.error(err.message || 'Failed to cancel trip. Please try again.');
     }
   };
 
@@ -183,8 +189,8 @@ function MyTrips() {
               <h3 className="mt-4 text-lg font-medium text-gray-900">No {activeTab} trips found</h3>
               <p className="mt-2 text-sm text-gray-500">
                 {activeTab === 'upcoming' 
-                  ? 'You don\'t have any upcoming trips. Why not offer a ride?' 
-                  : 'You haven\'t completed any trips yet.'}
+                  ? 'You haven\'t accepted any rides yet. Check the "Find Passengers" page to see available rides.' 
+                  : 'You haven\'t completed any trips as a driver yet.'}
               </p>
             </div>
           ) : (
@@ -201,6 +207,11 @@ function MyTrips() {
                       </h3>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                         {trip.distance} km
+                      </span>
+                    </div>
+                    <div className="mt-1">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                        Driver
                       </span>
                     </div>
                   </div>
@@ -227,6 +238,14 @@ function MyTrips() {
                       </svg>
                       <span className="font-medium text-blue-700">₹{trip.price}</span>
                       <span className="ml-1 text-gray-500">per seat</span>
+                    </div>
+
+                    <div className="flex items-center text-sm text-gray-700 mb-2">
+                      <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-gray-700">Status: </span>
+                      <span className="ml-1 font-medium text-green-600">{trip.status}</span>
                     </div>
 
                     <div className="mt-4">

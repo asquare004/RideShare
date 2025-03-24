@@ -29,7 +29,7 @@ function Navbar() {
             </span>
           </div>
           
-          <div className="flex items-center space-x-8">
+          <div className="flex items-center space-x-6">
             <Link
               to='/'
               className='self-center whitespace-nowrap text-sm sm:text-xl font-semibold dark:text-white'

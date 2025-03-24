@@ -3,36 +3,28 @@ import { errorHandler } from './error.js';
 
 // For regular user authentication
 export const verifyToken = (req, res, next) => {
-  console.log('verifyToken middleware called');
-  console.log('Request cookies:', req.cookies);
-  
-  // Get token from cookie only
+  // Get token from cookie or Authorization header
   const token = req.cookies.access_token;
-  
-  // Also check Authorization header as fallback
   const authHeader = req.headers.authorization;
   let headerToken = null;
   
   if (authHeader && authHeader.startsWith('Bearer ')) {
     headerToken = authHeader.substring(7);
-    console.log('Found token in Authorization header');
   }
   
   // Use cookie token or header token
   const finalToken = token || headerToken;
   
   if (!finalToken) {
-    console.log('No token found in cookies or headers');
     return next(errorHandler(401, 'You are not authenticated'));
   }
   
   try {
     const decoded = jwt.verify(finalToken, process.env.JWT_SECRET);
-    console.log('Token verified successfully. User ID:', decoded.id);
-    req.user = decoded;
+    req.user = { ...decoded, _id: decoded.id }; // Ensure _id is set for compatibility
     next();
   } catch (err) {
-    console.log('Token verification error:', err);
+    console.error('Token verification error:', err);
     return next(errorHandler(403, 'Token is not valid'));
   }
 };

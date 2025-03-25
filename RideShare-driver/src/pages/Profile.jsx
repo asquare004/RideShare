@@ -228,7 +228,7 @@ function Profile() {
       }
       
       setUpdateSuccess(true);
-      setIsEditing(false);
+    setIsEditing(false);
       setUploadedImage(null);
       
       // Update the profile data with the returned data
@@ -276,70 +276,30 @@ function Profile() {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex justify-center items-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading profile...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-8 pt-20 pb-8">
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-lg shadow-lg p-6"
-      >
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Driver Profile</h2>
-          <div className="flex space-x-4">
-            {/* Debug buttons - can be removed in production */}
-            {isDebugMode && (
-              <>
-                <button
-                  onClick={() => console.log('Current User:', currentUser)}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-700 font-medium"
-                >
-                  Debug User
-                </button>
-                <button
-                  onClick={() => fetchDriverProfile()}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-700 font-medium"
-                >
-                  Refresh Profile
-                </button>
-              </>
-            )}
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium"
-            >
-              {isEditing ? 'Cancel' : 'Edit Profile'}
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="mb-6 bg-red-50 p-4 rounded-md">
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
-        )}
-
-        {updateSuccess && (
-          <div className="mb-6 bg-green-50 p-4 rounded-md">
-            <p className="text-sm text-green-600">Profile updated successfully!</p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Profile Stats */}
-          <div className="lg:col-span-1">
-            <div className="bg-gray-50 rounded-lg p-6">
-              <div className="text-center mb-6">
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-8 pt-20 pb-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-xl shadow-sm overflow-hidden"
+        >
+          {/* Profile Header */}
+          <div className="relative h-32 bg-gradient-to-r from-blue-500 to-blue-600">
+            <div className="absolute -bottom-12 left-8">
+              <div className="relative">
                 {(uploadedImage || profileData.profilePicture) && !imageError ? (
-                  <div className="relative w-32 h-32 mx-auto mb-4 overflow-hidden rounded-full">
+                  <div className="w-24 h-24 rounded-full ring-4 ring-white overflow-hidden bg-white">
                     <img 
                       src={uploadedImage || profileData.profilePicture} 
                       alt={`${profileData.firstName} ${profileData.lastName}`}
@@ -355,70 +315,93 @@ function Profile() {
                         className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 cursor-pointer"
                         onClick={triggerFileInput}
                       >
-                        <span className="text-white text-sm font-medium">Change Photo</span>
-                        <input 
-                          type="file" 
-                          ref={fileInputRef}
-                          onChange={handleImageUpload}
-                          accept="image/*"
-                          className="hidden"
-                        />
+                        <span className="text-white text-xs">Change</span>
                       </div>
                     )}
                   </div>
                 ) : (
                   <div 
-                    className={`w-32 h-32 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center ${isEditing ? 'cursor-pointer' : ''}`}
+                    className={`w-24 h-24 bg-white rounded-full ring-4 ring-white flex items-center justify-center ${isEditing ? 'cursor-pointer' : ''}`}
                     onClick={isEditing ? triggerFileInput : undefined}
                   >
-                    <span className="text-4xl text-gray-600">
+                    <span className="text-2xl text-gray-600">
                       {getInitials(profileData.firstName, profileData.lastName)}
                     </span>
-                    {isEditing && (
-                      <input 
-                        type="file" 
-                        ref={fileInputRef}
-                        onChange={handleImageUpload}
-                        accept="image/*"
-                        className="hidden"
-                      />
-                    )}
                   </div>
                 )}
-                <h3 className="text-xl font-semibold">
-                  {profileData.firstName} {profileData.lastName}
-                </h3>
-                <p className="text-gray-600">Driver</p>
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
               </div>
-
-              <div className="space-y-4">
-                <div className="text-center">
-                  <p className="text-sm text-gray-600">Rating</p>
-                  <div className="flex items-center justify-center mt-1">
-                    <span className="text-2xl font-bold text-blue-600">{profileData.rating.toFixed(1)}</span>
-                    <span className="text-yellow-400 ml-2">★</span>
-                  </div>
-                </div>
-
-                <div className="text-center">
-                  <p className="text-sm text-gray-600">Total Trips</p>
-                  <p className="text-2xl font-bold text-blue-600">{profileData.totalTrips}</p>
-                </div>
-
-                <div className="text-center">
-                  <p className="text-sm text-gray-600">Member Since</p>
-                  <p className="text-lg font-semibold">{formatDate(profileData.memberSince)}</p>
-                </div>
-              </div>
+            </div>
+            
+            <div className="absolute top-4 right-6 flex space-x-3">
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  isEditing 
+                    ? 'bg-white text-blue-600 hover:bg-gray-50'
+                    : 'bg-blue-400 text-white hover:bg-blue-300'
+                }`}
+              >
+                {isEditing ? 'Cancel' : 'Edit Profile'}
+              </button>
             </div>
           </div>
 
-          {/* Profile Details */}
-          <div className="lg:col-span-2">
-            <form onSubmit={handleSubmit}>
+          {/* Profile Content */}
+          <div className="pt-16 px-8 pb-8">
+            {/* Name and Status */}
+            <div className="mb-8">
+              <h1 className="text-2xl font-bold text-gray-900">
+                {profileData.firstName} {profileData.lastName}
+              </h1>
+              <p className="text-gray-500 mt-1">Driver</p>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className="bg-white rounded-lg border border-gray-100 p-4 text-center">
+                <div className="flex items-center justify-center text-yellow-400 mb-2">
+                  <span className="text-3xl font-bold text-gray-800">{profileData.rating.toFixed(1)}</span>
+                  <span className="ml-1">★</span>
+                </div>
+                <p className="text-sm text-gray-600">Rating</p>
+              </div>
+              
+              <div className="bg-white rounded-lg border border-gray-100 p-4 text-center">
+                <div className="text-3xl font-bold text-gray-800 mb-2">{profileData.totalTrips}</div>
+                <p className="text-sm text-gray-600">Total Trips</p>
+              </div>
+              
+              <div className="bg-white rounded-lg border border-gray-100 p-4 text-center">
+                <div className="text-lg font-semibold text-gray-800 mb-2">{formatDate(profileData.memberSince)}</div>
+                <p className="text-sm text-gray-600">Member Since</p>
+              </div>
+            </div>
+
+            {/* Success/Error Messages */}
+            {error && (
+              <div className="mb-6 bg-red-50 px-4 py-3 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
+            {updateSuccess && (
+              <div className="mb-6 bg-green-50 px-4 py-3 rounded-lg">
+                <p className="text-sm text-green-600">Profile updated successfully!</p>
+              </div>
+            )}
+
+            {/* Profile Form */}
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     First Name
                   </label>
                   <input
@@ -427,13 +410,13 @@ function Profile() {
                     value={profileData.firstName}
                     onChange={handleChange}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Last Name
                   </label>
                   <input
@@ -442,13 +425,13 @@ function Profile() {
                     value={profileData.lastName}
                     onChange={handleChange}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Email
                   </label>
                   <input
@@ -457,13 +440,13 @@ function Profile() {
                     value={profileData.email}
                     onChange={handleChange}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Phone Number
                   </label>
                   <input
@@ -472,13 +455,13 @@ function Profile() {
                     value={profileData.phoneNumber}
                     onChange={handleChange}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Vehicle Model
                   </label>
                   <input
@@ -487,13 +470,13 @@ function Profile() {
                     value={profileData.vehicleModel}
                     onChange={handleChange}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Vehicle Year
                   </label>
                   <input
@@ -502,13 +485,13 @@ function Profile() {
                     value={profileData.vehicleYear}
                     onChange={handleChange}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     License Plate
                   </label>
                   <input
@@ -517,13 +500,13 @@ function Profile() {
                     value={profileData.licensePlate}
                     onChange={handleChange}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Driver's License Number
                   </label>
                   <input
@@ -532,16 +515,16 @@ function Profile() {
                     value={profileData.licenseNumber}
                     onChange={handleChange}
                     disabled={!isEditing}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
                   />
                 </div>
               </div>
 
               {isEditing && (
-                <div className="mt-6 flex justify-end">
+                <div className="flex justify-end pt-4">
                   <button
                     type="submit"
-                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-100 transition-colors font-medium"
                   >
                     Save Changes
                   </button>
@@ -549,8 +532,8 @@ function Profile() {
               )}
             </form>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 }

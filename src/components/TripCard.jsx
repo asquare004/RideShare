@@ -19,10 +19,21 @@ function TripCard({ trip, onViewDetails, isCompleted, tripType = 'joined' }) {
     }
   };
 
-  // Calculate border color based on completion status
-  const borderColorClass = isCompleted 
-    ? 'border-gray-300' 
-    : 'border-blue-500';
+  // Calculate border color based on trip status
+  const getBorderColorClass = () => {
+    switch(trip.status) {
+      case 'completed':
+        return 'border-green-500';
+      case 'scheduled':
+        return 'border-blue-500';
+      case 'pending':
+        return 'border-yellow-500';
+      case 'cancelled':
+        return 'border-red-500';
+      default:
+        return 'border-gray-300';
+    }
+  };
 
   const formattedDate = formatDate(trip.date);
 
@@ -42,9 +53,47 @@ function TripCard({ trip, onViewDetails, isCompleted, tripType = 'joined' }) {
       );
     }
   };
+  
+  // Render status badge
+  const renderStatusBadge = () => {
+    let bgColor, textColor, label;
+    
+    switch(trip.status) {
+      case 'completed':
+        bgColor = 'bg-green-100';
+        textColor = 'text-green-800';
+        label = 'Completed';
+        break;
+      case 'scheduled':
+        bgColor = 'bg-blue-100';
+        textColor = 'text-blue-800';
+        label = 'Scheduled';
+        break;
+      case 'pending':
+        bgColor = 'bg-yellow-100';
+        textColor = 'text-yellow-800';
+        label = 'Pending';
+        break;
+      case 'cancelled':
+        bgColor = 'bg-red-100';
+        textColor = 'text-red-800';
+        label = 'Cancelled';
+        break;
+      default:
+        bgColor = 'bg-gray-100';
+        textColor = 'text-gray-800';
+        label = 'Unknown';
+    }
+    
+    return (
+      <span className={`px-2 py-1 text-xs font-medium ${bgColor} ${textColor} rounded-full`}>
+        {label}
+      </span>
+    );
+  };
 
   return (
-    <div className={`bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border-l-4 ${borderColorClass}`}>
+    <div className={`bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 border-l-4 ${getBorderColorClass()}`}>
       <div className="p-4">
         {/* Trip information */}
         <div className="flex-grow">
@@ -62,11 +111,7 @@ function TripCard({ trip, onViewDetails, isCompleted, tripType = 'joined' }) {
             </div>
             <div className="flex items-center space-x-2">
               {renderTripTypeBadge()}
-              {isCompleted && (
-                <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full">
-                  Completed
-                </span>
-              )}
+              {renderStatusBadge()}
             </div>
           </div>
           
@@ -115,7 +160,7 @@ function TripCard({ trip, onViewDetails, isCompleted, tripType = 'joined' }) {
           <button 
             onClick={() => onViewDetails(trip)} 
             className={`w-full py-2 px-4 rounded-md text-center transition-colors ${
-              isCompleted 
+              trip.status === 'cancelled' || trip.status === 'completed' 
                 ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
                 : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
             }`}

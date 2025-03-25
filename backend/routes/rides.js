@@ -10,7 +10,10 @@ import {
   getPendingRideStatus,
   cancelPendingRide,
   acceptRideAsDriver,
-  getRideById
+  getRideById,
+  getAvailableRides,
+  cancelRide,
+  bookRide
 } from '../controllers/ride.js';
 
 const router = express.Router();
@@ -21,6 +24,9 @@ router.post('/create', verifyToken, createRide);
 // Get rides with filter options
 router.get('/', getRides);
 
+// Get available rides for the current user (excluding rides where user is a passenger)
+router.get('/available', verifyToken, getAvailableRides);
+
 // Check ride status and driver acceptance
 router.get('/pending-status/:rideId', getPendingRideStatus);
 
@@ -29,6 +35,9 @@ router.put('/cancel-pending/:rideId', cancelPendingRide);
 
 // Driver accepting a ride
 router.put('/accept/:rideId', verifyDriver, acceptRideAsDriver);
+
+// Cancel a ride (change status to cancelled)
+router.put('/cancel/:rideId', verifyToken, cancelRide);
 
 // Get a single ride by ID
 router.get('/:rideId', getRideById);
@@ -41,6 +50,9 @@ router.delete('/:rideId', verifyToken, deleteRide);
 
 // Join a ride as a passenger
 router.post('/:rideId/join', verifyToken, joinRide);
+
+// Book a ride with multiple seats
+router.post('/:rideId/book', verifyToken, bookRide);
 
 // Cancel a booking
 router.post('/:rideId/cancel', verifyToken, cancelBooking);

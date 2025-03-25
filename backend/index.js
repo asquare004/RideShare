@@ -9,6 +9,7 @@ import userRouter from './routes/user.js';
 import driverRouter from './routes/driver.js';
 import path from 'path';
 import cors from 'cors';
+import Ride from './models/Ride.js';
 
 dotenv.config();
 
@@ -43,14 +44,49 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/rideshare
   minPoolSize: 2, // Minimum number of connections in the connection pool
   retryWrites: true, // Retry writes if a network error happens
 })
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((error) => {
-    console.error('MongoDB connection error:', error);
-    // Log more detailed error information
-    if (error.name === 'MongoTimeoutError') {
-      console.error('Connection timeout. Check if MongoDB server is running and accessible.');
-    }
+  .then(() => {
+    console.log('Connected to MongoDB');
+    setupScheduledTasks(); // Setup cleanup tasks after DB connection
+  })
+  .catch((err) => {
+    console.error('Error connecting to MongoDB', err);
   });
+
+// Setup scheduled tasks for maintenance
+function setupScheduledTasks() {
+  // Schedule a task to run every hour to mark past rides as completed
+  setInterval(async () => {
+    try {
+      console.log('Running scheduled task: updating past rides statuses');
+      
+      const currentDate = new Date();
+      const dateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      const timeString = currentDate.toTimeString().split(' ')[0]; // HH:MM:SS
+      
+      // Find scheduled/pending rides that are in the past
+      const result = await Ride.updateMany(
+        {
+          status: { $in: ['scheduled', 'pending'] },
+          $or: [
+            // Past date
+            { date: { $lt: dateString } },
+            // Same date but past time
+            { date: dateString, departureTime: { $lt: timeString } }
+          ]
+        },
+        { $set: { status: 'completed' } }
+      );
+      
+      if (result.modifiedCount > 0) {
+        console.log(`Updated ${result.modifiedCount} past rides to 'completed' status`);
+      } else {
+        console.log('No past rides needed status updates');
+      }
+    } catch (error) {
+      console.error('Error in scheduled ride status update:', error);
+    }
+  }, 60 * 60 * 1000); // Run every hour
+}
 
 // Set security headers (optional but recommended for Cross-Origin-Opener-Policy warnings)
 app.use((req, res, next) => {

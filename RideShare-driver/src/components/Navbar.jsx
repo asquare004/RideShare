@@ -19,15 +19,11 @@ function Navbar() {
     { name: 'Payment History', path: '/payment-history' },
   ];
 
-  const openSignOutModal = () => {
+  const handleSignOut = () => {
     setShowSignOutModal(true);
   };
 
-  const closeSignOutModal = () => {
-    setShowSignOutModal(false);
-  };
-
-  const handleSignOut = async () => {
+  const confirmSignOut = async () => {
     try {
       const res = await fetch('/api/driver/signout', {
         method: 'POST',
@@ -43,109 +39,56 @@ function Navbar() {
     } catch (error) {
       console.error(error);
     }
-    closeSignOutModal();
+    setShowSignOutModal(false);
   };
 
   return (
     <>
-      <nav className="bg-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <Link to="/" className="flex-shrink-0 flex items-center">
-                <h1 className="text-2xl font-bold text-blue-600">RideShare Driver</h1>
-              </Link>
-            </div>
-
-            {/* Desktop Navigation */}
-            <div className="hidden sm:flex sm:items-center sm:space-x-4">
-              {navigationItems.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.path}
-                  className="text-gray-600 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  {item.name}
-                </Link>
-              ))}
-              <div className="flex items-center space-x-2 ml-4">
-                {currentUser ? (
-                  <button
-                    onClick={openSignOutModal}
-                    className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition-colors"
-                  >
-                    Sign Out
-                  </button>
-                ) : (
-                  <Link
-                    to="/sign-in"
-                    className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    Sign In
-                  </Link>
-                )}
-              </div>
-            </div>
-
-            {/* Mobile menu button */}
-            <div className="sm:hidden flex items-center">
-              <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-blue-600 focus:outline-none"
-              >
-                {isOpen ? (
-                  <XMarkIcon className="block h-6 w-6" />
-                ) : (
-                  <Bars3Icon className="block h-6 w-6" />
-                )}
+      <nav className="bg-white border-b border-gray-100 shadow-sm fixed w-full top-0 z-50">
+        <div className="container mx-auto px-8 py-4 flex justify-between items-center">
+          <div className="flex items-center cursor-pointer">
+            <Link to="/" className="text-3xl text-blue-600 font-sans font-semibold tracking-tight">
+              Ride<span className="font-bold">Share</span>-Driver
+            </Link>
+          </div>
+          
+          <div className="flex items-center space-x-6">
+            <Link to="/">
+              <button className="text-gray-600 hover:text-blue-600 text-base font-inter transition-colors duration-200">
+                Home
               </button>
-            </div>
+            </Link>
+            <Link to="/my-trips">
+              <button className="text-gray-600 hover:text-blue-600 text-base font-inter transition-colors duration-200">
+                My Trips
+              </button>
+            </Link>
+            <Link to="/find-passengers">
+              <button className="text-gray-600 hover:text-blue-600 text-base font-inter transition-colors duration-200">
+                Find Passengers
+              </button>
+            </Link>
+            <Link to="/payment-history">
+              <button className="text-gray-600 hover:text-blue-600 text-base font-inter transition-colors duration-200">
+                Payment History
+              </button>
+            </Link>
+            {currentUser ? (
+              <button
+                onClick={handleSignOut}
+                className="bg-red-600 text-white px-6 py-2 rounded-md text-base font-inter hover:bg-red-700 transition-all duration-200"
+              >
+                Sign Out
+              </button>
+            ) : (
+              <Link to="/sign-in">
+                <button className="bg-blue-600 text-white px-6 py-2 rounded-md text-base font-inter hover:bg-blue-700 transition-all duration-200">
+                  Sign In
+                </button>
+              </Link>
+            )}
           </div>
         </div>
-
-        {/* Mobile Navigation */}
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="sm:hidden"
-          >
-            <div className="pt-2 pb-3 space-y-1">
-              {navigationItems.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.path}
-                  className="block px-3 py-2 text-base font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50"
-                  onClick={() => setIsOpen(false)}
-                >
-                  {item.name}
-                </Link>
-              ))}
-              <div className="border-t border-gray-200 pt-2">
-                {currentUser ? (
-                  <button
-                    onClick={() => {
-                      openSignOutModal();
-                      setIsOpen(false);
-                    }}
-                    className="block w-full text-left px-3 py-2 text-base font-medium text-blue-600 hover:text-blue-700 hover:bg-gray-50"
-                  >
-                    Sign Out
-                  </button>
-                ) : (
-                  <Link
-                    to="/sign-in"
-                    className="block px-3 py-2 text-base font-medium text-blue-600 hover:text-blue-700 hover:bg-gray-50"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Sign In
-                  </Link>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
       </nav>
 
       {/* Sign Out Confirmation Modal */}
@@ -160,13 +103,13 @@ function Navbar() {
             </p>
             <div className="flex justify-end space-x-4">
               <button
-                onClick={closeSignOutModal}
+                onClick={() => setShowSignOutModal(false)}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-500 transition-colors duration-200"
               >
                 No, Cancel
               </button>
               <button
-                onClick={handleSignOut}
+                onClick={confirmSignOut}
                 className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors duration-200"
               >
                 Yes, Sign Out

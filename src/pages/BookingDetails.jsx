@@ -36,6 +36,43 @@ function BookingDetails() {
     }
   }, [ride, navigate]);
 
+  // Add effect to check for seat availability in real-time
+  useEffect(() => {
+    // Don't make API calls for view-only mode
+    if (isViewOnly || !ride?._id) return;
+
+    const fetchLatestRideData = async () => {
+      try {
+        const latestRide = await rideService.getRideById(ride._id);
+        // Only update leftSeats to avoid losing other ride details
+        if (latestRide && latestRide.leftSeats !== ride.leftSeats) {
+          console.log('Updating available seats from', ride.leftSeats, 'to', latestRide.leftSeats);
+          setRide(prevRide => ({
+            ...prevRide,
+            leftSeats: latestRide.leftSeats,
+            status: latestRide.status
+          }));
+          
+          // Adjust seatsToBook if necessary
+          if (seatsToBook > latestRide.leftSeats) {
+            setSeatsToBook(Math.max(1, latestRide.leftSeats));
+          }
+        }
+      } catch (error) {
+        console.error('Error refreshing ride data:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchLatestRideData();
+
+    // Set up interval to periodically check for updates (every 15 seconds)
+    const intervalId = setInterval(fetchLatestRideData, 15000);
+
+    // Clean up interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [ride?._id, isViewOnly, ride?.leftSeats, seatsToBook]);
+
   const handleSeatsChange = (e) => {
     const value = parseInt(e.target.value);
     if (value > 0 && value <= ride.leftSeats) {
@@ -98,14 +135,26 @@ function BookingDetails() {
         }
       });
 
-      // Use the rideService to join the ride
-      await rideService.joinRide(ride._id, seatsToBook);
+      // Use the dedicated book ride endpoint
+      await rideService.bookRide(ride._id, {
+        bookedSeats: seatsToBook,
+        userId: currentUser._id
+      });
 
       // Handle successful booking
       navigate('/', { 
         state: { 
           bookingSuccess: true,
-          message: `Successfully booked ${seatsToBook} seat(s) for the ride from ${ride.source} to ${ride.destination}` 
+          message: `Successfully booked ${seatsToBook} seat(s) for the ride from ${ride.source} to ${ride.destination}`,
+          rideDetails: {
+            id: ride._id,
+            source: ride.source,
+            destination: ride.destination,
+            date: ride.date,
+            time: ride.departureTime,
+            seats: seatsToBook,
+            price: ride.price * seatsToBook
+          }
         } 
       });
     } catch (error) {
@@ -216,12 +265,6 @@ function BookingDetails() {
                 <span className="text-gray-600">Distance</span>
                 <span className="font-medium">{ride.distance || 0} km</span>
               </div>
-              {isViewOnly && (
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Paid</span>
-                  <span className="font-medium text-blue-600">₹{ride.price * ride.leftSeats}</span>
-                </div>
-              )}
             </div>
           </div>
 
@@ -288,12 +331,18 @@ function BookingDetails() {
             {!isViewOnly && (
               <button
                 onClick={handleSeatSelection}
-                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                className={`flex-1 py-3 rounded-lg transition-colors flex items-center justify-center ${
+                  ride.leftSeats < 1 || ride.status !== 'scheduled' 
+                    ? 'bg-gray-400 text-white cursor-not-allowed' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+                disabled={ride.leftSeats < 1 || ride.status !== 'scheduled'}
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Book Now
+                {ride.leftSeats < 1 ? 'No Seats Available' : 
+                 ride.status !== 'scheduled' ? `Ride ${ride.status}` : 'Book Now'}
               </button>
             )}
           </div>
@@ -325,13 +374,23 @@ function BookingDetails() {
             <div className="flex space-x-4">
               <button
                 onClick={handleConfirmBooking}
-                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
+                disabled={isLoading}
+                className={`flex-1 ${isLoading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} text-white py-2 rounded-lg flex items-center justify-center`}
               >
-                Confirm
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </>
+                ) : 'Confirm'}
               </button>
               <button
                 onClick={() => setShowConfirmation(false)}
                 className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300"
+                disabled={isLoading}
               >
                 Cancel
               </button>

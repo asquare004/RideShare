@@ -22,9 +22,30 @@ function RideCard({ ride, onBookRide }) {
     return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
   };
 
+  // Function to get status badge styling
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      scheduled: { bg: 'bg-green-100', text: 'text-green-800', label: 'Scheduled' },
+      pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pending' },
+      completed: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Completed' },
+      cancelled: { bg: 'bg-red-100', text: 'text-red-800', label: 'Cancelled' },
+    };
+    
+    const config = statusConfig[status] || statusConfig.scheduled;
+    
+    return (
+      <span className={`${config.bg} ${config.text} text-xs px-2 py-1 rounded-full font-medium`}>
+        {config.label}
+      </span>
+    );
+  };
+
   // Get driver info with fallback values for safety
   const driverName = ride.driverName || 'Driver';
-  const driverRating = ride.driverRating || '4.5';
+  const driverRating = ride.driverRating || 4.5;
+  const profilePicture = ride.driverProfilePicture;
+  // Get ride status with fallback to scheduled
+  const status = ride.status || 'scheduled';
   
   // Handle click on Book Ride button
   const handleBookClick = () => {
@@ -33,9 +54,16 @@ function RideCard({ ride, onBookRide }) {
   };
   
   return (
-    <div className="bg-white shadow-md rounded-lg p-4 flex justify-between items-center hover:shadow-lg transition-shadow duration-300">
+    <div className={`bg-white shadow-md rounded-lg p-4 flex justify-between items-center hover:shadow-lg transition-shadow duration-300 border-l-4 ${
+      status === 'cancelled' ? 'border-red-500' : 
+      status === 'completed' ? 'border-blue-500' : 
+      status === 'pending' ? 'border-yellow-500' : 'border-green-500'
+    }`}>
       <div className="flex-grow pr-4">
-        <h3 className="text-lg font-semibold text-gray-800">{driverName}</h3>
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-800">{driverName}</h3>
+          {getStatusBadge(status)}
+        </div>
         
         {/* Source and destination with horizontal arrow */}
         <div className="text-gray-600 mt-2 flex items-center">
@@ -101,16 +129,26 @@ function RideCard({ ride, onBookRide }) {
           ₹{ride.price || 0}
           <span className="text-sm font-normal text-gray-600 block">per person</span>
         </div>
-        <button 
-          onClick={handleBookClick}
-          className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-colors duration-300 flex items-center"
-          aria-label={`Book ride from ${ride.source} to ${ride.destination}`}
-        >
-          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Book Ride
-        </button>
+        {status !== 'cancelled' && (
+          <button 
+            onClick={handleBookClick}
+            className={`mt-3 px-4 py-2 rounded-full flex items-center ${
+              status === 'completed' ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
+            } transition-colors duration-300`}
+            disabled={status === 'completed'}
+            aria-label={`Book ride from ${ride.source} to ${ride.destination}`}
+          >
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Book Ride
+          </button>
+        )}
+        {status === 'cancelled' && (
+          <div className="mt-3 text-red-600 text-sm font-medium">
+            This ride has been cancelled
+          </div>
+        )}
       </div>
     </div>
   );

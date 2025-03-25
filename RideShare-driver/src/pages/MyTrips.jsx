@@ -89,6 +89,78 @@ function MyTrips() {
     }
   };
 
+  // Function to get border color based on status
+  const getBorderColor = (status) => {
+    switch(status?.toLowerCase()) {
+      case 'scheduled': return 'border-green-400';
+      case 'pending': return 'border-yellow-400';
+      case 'completed': return 'border-blue-400';
+      case 'cancelled': return 'border-red-400';
+      case 'ongoing': return 'border-purple-400';
+      default: return 'border-gray-300';
+    }
+  };
+
+  // Function to get status badge
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      'scheduled': { 
+        bgColor: 'bg-green-100', 
+        textColor: 'text-green-800', 
+        icon: (
+          <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )
+      },
+      'pending': { 
+        bgColor: 'bg-yellow-100', 
+        textColor: 'text-yellow-800', 
+        icon: (
+          <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )
+      },
+      'completed': { 
+        bgColor: 'bg-blue-100', 
+        textColor: 'text-blue-800', 
+        icon: (
+          <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+          </svg>
+        )
+      },
+      'cancelled': { 
+        bgColor: 'bg-red-100', 
+        textColor: 'text-red-800', 
+        icon: (
+          <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        )
+      },
+      'ongoing': { 
+        bgColor: 'bg-purple-100', 
+        textColor: 'text-purple-800', 
+        icon: (
+          <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        )
+      }
+    };
+    
+    const config = statusConfig[status?.toLowerCase()] || statusConfig.scheduled;
+    
+    return (
+      <span className={`flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${config.bgColor} ${config.textColor}`}>
+        {config.icon}
+        {status ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() : 'Scheduled'}
+      </span>
+    );
+  };
+
   // Sign-in required notice
   if (!currentUser) {
     return (
@@ -120,23 +192,224 @@ function MyTrips() {
     );
   }
 
+  const renderRideCard = (trip) => {
+    // Calculate booked seats
+    const totalSeats = trip.totalSeats || 4;
+    const bookedSeats = totalSeats - (trip.leftSeats || 0);
+    const earnings = trip.price * bookedSeats;
+    
+    return (
+      <div 
+        key={trip._id}
+        className={`bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 ${getBorderColor(trip.status)} border-l-4`}
+      >
+        {/* Trip Header */}
+        <div className="bg-gray-50 p-3 border-b border-gray-100">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-2">
+              <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded">
+                {trip.distance} km
+              </span>
+              {getStatusBadge(trip.status)}
+            </div>
+            <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full flex items-center">
+              <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              ₹{earnings}
+            </span>
+          </div>
+          
+          <div className="mt-2">
+            <div className="flex items-center space-x-2">
+              <div className="flex-1">
+                <p className="text-xs text-gray-500 mb-0.5">From</p>
+                <p className="font-medium text-gray-900 truncate text-sm">{trip.source.split(',')[0]}</p>
+              </div>
+              <div className="flex-shrink-0">
+                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-gray-500 mb-0.5">To</p>
+                <p className="font-medium text-gray-900 truncate text-sm">{trip.destination.split(',')[0]}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Trip Details */}
+        <div className="p-3">
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            {/* Date and Time */}
+            <div className="flex items-start">
+              <div className="p-1.5 bg-blue-50 rounded-lg mr-2">
+                <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Date & Time</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {new Date(trip.date).toLocaleDateString('en-US', { 
+                    weekday: 'short',
+                    month: 'short', 
+                    day: 'numeric'
+                  })}
+                </p>
+                <p className="text-xs text-gray-600">{trip.departureTime}</p>
+              </div>
+            </div>
+            
+            {/* Price Details */}
+            <div className="flex items-start">
+              <div className="p-1.5 bg-green-50 rounded-lg mr-2">
+                <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Price Details</p>
+                <p className="text-sm font-medium text-green-600">₹{trip.price} per seat</p>
+                <p className="text-xs text-gray-600">
+                  Total: ₹{earnings}
+                </p>
+              </div>
+            </div>
+            
+            {/* Seats */}
+            <div className="flex items-start">
+              <div className="p-1.5 bg-purple-50 rounded-lg mr-2">
+                <svg className="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Passengers</p>
+                <div className="flex items-center mt-1">
+                  <div className="flex-1">
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium">{bookedSeats}/{totalSeats} booked</span>
+                      <div className="ml-2 flex space-x-1">
+                        {[...Array(totalSeats)].map((_, i) => (
+                          <div
+                            key={i}
+                            className={`w-2 h-2 rounded-full ${
+                              i < bookedSeats ? 'bg-purple-500' : 'bg-gray-200'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {bookedSeats === totalSeats 
+                        ? 'Fully booked' 
+                        : `${totalSeats - bookedSeats} seat${totalSeats - bookedSeats !== 1 ? 's' : ''} available`
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Passenger List */}
+            <div className="flex items-start">
+              <div className="p-1.5 bg-indigo-50 rounded-lg mr-2">
+                <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Passenger List</p>
+                {trip.passengers && trip.passengers.length > 0 ? (
+                  <div className="mt-1">
+                    {trip.passengers.slice(0, 2).map((passenger, index) => (
+                      <div key={index} className="flex items-center text-sm">
+                        <span className="font-medium text-gray-900">{passenger.name}</span>
+                        {passenger.rating && (
+                          <div className="flex items-center ml-2">
+                            <svg className="w-3 h-3 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                            <span className="text-xs ml-1 text-gray-600">{passenger.rating}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {trip.passengers.length > 2 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        +{trip.passengers.length - 2} more passengers
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No passengers yet</p>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex space-x-2 pt-2 border-t border-gray-100">
+            <button
+              onClick={() => handleViewDetails(trip)}
+              className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              View Details
+            </button>
+            
+            {trip.status !== 'cancelled' && trip.status !== 'completed' && (
+              <>
+                <button
+                  onClick={() => handleStartRide(trip._id)}
+                  className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Start Ride
+                </button>
+                
+                <button
+                  onClick={() => handleCancelRide(trip._id)}
+                  className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Cancel Ride
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 pt-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">My Trips</h2>
-            <p className="mt-1 text-sm text-gray-600">
+    <div className="min-h-screen bg-gray-100">
+      <div className="container mx-auto px-8 pt-20 pb-8">
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-4">
+            <h2 className="text-xl font-bold text-gray-900">My Trips</h2>
+            <p className="mt-0.5 text-sm text-gray-600">
               View and manage all your trips as a driver
             </p>
           </div>
 
           {/* Tabs */}
-          <div className="border-b border-gray-200 mb-6">
-            <nav className="-mb-px flex space-x-8">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8 px-4">
               <button
                 onClick={() => setActiveTab('upcoming')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'upcoming'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -146,7 +419,7 @@ function MyTrips() {
               </button>
               <button
                 onClick={() => setActiveTab('past')}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'past'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -157,121 +430,26 @@ function MyTrips() {
             </nav>
           </div>
 
-          {loading ? (
-            <div className="flex justify-center py-10">
-              <svg className="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            </div>
-          ) : error ? (
-            <div className="text-center py-10">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-                <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
+          {/* Content */}
+          <div className="p-4">
+            {loading ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
               </div>
-              <h3 className="mt-4 text-lg font-medium text-gray-900">{error}</h3>
-              <button
-                onClick={fetchTrips}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
-              >
-                Try Again
-              </button>
-            </div>
-          ) : trips.length === 0 ? (
-            <div className="text-center py-10">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
-                <svg className="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
+            ) : error ? (
+              <div className="text-center py-8">
+                <p className="text-red-600">{error}</p>
               </div>
-              <h3 className="mt-4 text-lg font-medium text-gray-900">No {activeTab} trips found</h3>
-              <p className="mt-2 text-sm text-gray-500">
-                {activeTab === 'upcoming' 
-                  ? 'You haven\'t accepted any rides yet. Check the "Find Passengers" page to see available rides.' 
-                  : 'You haven\'t completed any trips as a driver yet.'}
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {trips.map((trip) => (
-                <div 
-                  key={trip._id} 
-                  className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300"
-                >
-                  <div className="p-4 border-b border-gray-200 bg-gray-50">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold text-gray-900 truncate">
-                        {trip.source.split(',')[0]} → {trip.destination.split(',')[0]}
-                      </h3>
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {trip.distance} km
-                      </span>
-                    </div>
-                    <div className="mt-1">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                        Driver
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="px-4 py-3">
-                    <div className="flex items-center text-sm text-gray-700 mb-2">
-                      <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                      </svg>
-                      {formatDateTime(trip.date, trip.departureTime)}
-                    </div>
-
-                    <div className="flex items-center text-sm text-gray-700 mb-2">
-                      <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                      </svg>
-                      {trip.leftSeats} {trip.leftSeats === 1 ? 'seat' : 'seats'} available
-                    </div>
-
-                    <div className="flex items-center text-sm text-gray-700 mb-2">
-                      <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" />
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" />
-                      </svg>
-                      <span className="font-medium text-blue-700">₹{trip.price}</span>
-                      <span className="ml-1 text-gray-500">per seat</span>
-                    </div>
-
-                    <div className="flex items-center text-sm text-gray-700 mb-2">
-                      <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-gray-700">Status: </span>
-                      <span className="ml-1 font-medium text-green-600">{trip.status}</span>
-                    </div>
-
-                    <div className="mt-4">
-                      {activeTab === 'upcoming' && (
-                        <button
-                          onClick={() => cancelTrip(trip._id)}
-                          className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                        >
-                          Cancel Trip
-                        </button>
-                      )}
-                      
-                      {activeTab === 'past' && (
-                        <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 w-full justify-center">
-                          <svg className="mr-1.5 h-4 w-4 text-green-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          Completed
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+            ) : trips.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No trips found.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {trips.map((trip) => renderRideCard(trip))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

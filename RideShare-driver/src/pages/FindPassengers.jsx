@@ -10,6 +10,9 @@ function FindPassengers() {
   const [error, setError] = useState(null);
   const { currentUser } = useSelector(state => state.user);
   const navigate = useNavigate();
+  
+  // Set polling interval (in milliseconds)
+  const POLLING_INTERVAL = 3000; // 3 seconds
 
   useEffect(() => {
     // Redirect if not logged in
@@ -18,12 +21,23 @@ function FindPassengers() {
       return;
     }
     
+    // Initial fetch
     fetchPendingRides();
+    
+    // Set up polling interval
+    const pollingInterval = setInterval(() => {
+      fetchPendingRides(false); // Pass false to not show loading state during background polling
+    }, POLLING_INTERVAL);
+    
+    // Clear interval on component unmount
+    return () => clearInterval(pollingInterval);
   }, [currentUser, navigate]);
 
-  const fetchPendingRides = async () => {
+  const fetchPendingRides = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       setError(null);
       
       // Get rides with pending status
@@ -36,10 +50,15 @@ function FindPassengers() {
       setPendingRides(response.data.rides || []);
     } catch (err) {
       console.error('Error fetching pending rides:', err);
-      setError('Failed to load pending rides. Please try again.');
-      toast.error('Failed to load pending rides');
+      setError('Failed to load pending rides. The data will refresh automatically.');
+      // Only show toast error on initial load
+      if (showLoading) {
+        toast.error('Failed to load pending rides');
+      }
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -87,49 +106,36 @@ function FindPassengers() {
     }
   };
   
-  // Calculate estimated earnings
-  const calculateEarnings = (price, seats) => {
-    return price * seats;
+  // Calculate estimated earnings based on booked seats
+  const calculateEarnings = (pricePerSeat, bookedSeats) => {
+    return pricePerSeat * bookedSeats;
   };
 
   return (
     <div className="min-h-screen bg-gray-100 pt-24 pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow px-5 py-6 sm:px-6">
-          <div className="mb-8 flex justify-between items-center">
+          <div className="mb-8">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Find Passengers</h2>
               <p className="mt-1 text-sm text-gray-600">
                 Browse and accept rides from passengers looking for drivers
               </p>
+              <p className="mt-1 text-xs text-gray-500 italic">
+                Auto-refreshing every {POLLING_INTERVAL / 1000} seconds
+              </p>
             </div>
-            <button
-              onClick={fetchPendingRides}
-              className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Refreshing...
-                </>
-              ) : (
-                <>
-                  <svg className="mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </>
-              )}
-            </button>
           </div>
 
           {error && (
             <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-md">
               {error}
+            </div>
+          )}
+          
+          {loading && pendingRides.length === 0 && (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
             </div>
           )}
           
@@ -140,7 +146,7 @@ function FindPassengers() {
               </svg>
               <h3 className="mt-2 text-lg font-medium text-gray-900">No pending rides</h3>
               <p className="mt-1 text-sm text-gray-500">
-                There are no passengers currently looking for a ride. Check back later!
+                There are no passengers currently looking for a ride. The list will refresh automatically.
               </p>
             </div>
           )}
@@ -195,8 +201,9 @@ function FindPassengers() {
                   {/* Ride Details */}
                   <div className="grid grid-cols-3 gap-2 text-center border-t border-gray-200 pt-3">
                     <div>
-                      <div className="text-xs text-gray-500">Seats</div>
-                      <div className="font-semibold">{ride.leftSeats}</div>
+                      <div className="text-xs text-gray-500">Booked Seats</div>
+                      {/* Display booked seats (calculated as 4 - leftSeats) */}
+                      <div className="font-semibold">{4 - ride.leftSeats}</div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500">Distance</div>
@@ -213,7 +220,7 @@ function FindPassengers() {
                     <div className="flex justify-between items-center">
                       <div className="text-sm text-gray-600">Potential Earnings:</div>
                       <div className="font-bold text-green-600">
-                        ₹{calculateEarnings(ride.price, ride.leftSeats)}
+                        ₹{calculateEarnings(ride.price, 4 - ride.leftSeats)}
                       </div>
                     </div>
                   </div>

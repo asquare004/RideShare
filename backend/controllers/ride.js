@@ -120,7 +120,7 @@ export const getRides = async (req, res, next) => {
       ];
     }
 
-    console.log('Ride filter:', filter);
+    // console.log('Ride filter:', filter);
     
     // Get all rides that match the filters
     const allRides = await Ride.find(filter);
@@ -574,6 +574,237 @@ export const acceptRideAsDriver = async (req, res, next) => {
       return next(errorHandler(400, 'Duplicate key error'));
     }
     
+    next(error);
+  }
+};
+
+export const getAvailableRides = async (req, res, next) => {
+  try {
+    const userId = req.user ? req.user._id : null;
+    const userEmail = req.user ? req.user.email : null;
+    
+    // Build query to find rides with available seats
+    const query = {
+      leftSeats: { $gt: 0 },       // Only rides with seats available
+      status: 'scheduled',         // Only scheduled rides
+      date: { $gte: new Date().toISOString().split('T')[0] } // Only future rides
+    };
+    
+    // Apply additional filters from request if present
+    if (req.query.source) {
+      query.source = { $regex: req.query.source, $options: 'i' };
+    }
+    
+    if (req.query.destination) {
+      query.destination = { $regex: req.query.destination, $options: 'i' };
+    }
+    
+    if (req.query.date) {
+      query.date = req.query.date;
+    }
+    
+    // Find rides with the query
+    let rides = await Ride.find(query)
+      .populate('driverId', 'firstName lastName profilePicture rating')
+      .sort({ date: 1, departureTime: 1 })
+      .lean();
+    
+    if (!rides) {
+      console.log('No rides found matching query:', query);
+      return res.status(200).json({
+        success: true,
+        rides: [],
+        totalRides: 0,
+        message: 'No rides found matching your criteria.'
+      });
+    }
+    
+    console.log(`Found ${rides.length} rides before filtering for user ${userId || 'anonymous'}`);
+    
+    // Filter out rides created by current user
+    if (userId) {
+      rides = rides.filter(ride => {
+        // Check if user is the creator/driver
+        if (ride.driverId && typeof ride.driverId === 'object' && ride.driverId._id && 
+            ride.driverId._id.toString() === userId.toString()) {
+          return false;
+        }
+        if (ride.createdBy && ride.createdBy.toString() === userId.toString()) {
+          return false;
+        }
+        
+        // Check if user is already a passenger
+        if (ride.passengers && ride.passengers.length > 0) {
+          return !ride.passengers.some(passenger => 
+            (passenger.user && passenger.user.toString() === userId.toString()) ||
+            (passenger.email && passenger.email === userEmail)
+          );
+        }
+        
+        return true;
+      });
+      
+      console.log(`${rides.length} rides available after filtering for user ${userId}`);
+    }
+    
+    // Format rides response
+    const formattedRides = rides.map(ride => ({
+      ...ride,
+      driverName: ride.driverId && typeof ride.driverId === 'object' ? 
+        `${ride.driverId.firstName || ''} ${ride.driverId.lastName || ''}`.trim() || 'Driver' : 'Driver',
+      driverRating: ride.driverId && typeof ride.driverId === 'object' ? ride.driverId.rating : null,
+      driverProfilePicture: ride.driverId && typeof ride.driverId === 'object' ? ride.driverId.profilePicture : null
+    }));
+    
+    res.status(200).json({
+      success: true,
+      rides: formattedRides,
+      totalRides: formattedRides.length
+    });
+  } catch (error) {
+    console.error('Error in getAvailableRides:', error);
+    if (error.name === 'CastError') {
+      return next(errorHandler(400, 'Invalid ID format in request'));
+    } else if (error.kind === 'ObjectId') {
+      return next(errorHandler(400, 'Invalid ride ID format'));
+    }
+    next(error);
+  }
+};
+
+export const cancelRide = async (req, res, next) => {
+  try {
+    const { rideId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(rideId)) {
+      return next(errorHandler(400, 'Invalid ride ID format'));
+    }
+    
+    // Find the ride
+    const ride = await Ride.findById(rideId);
+    if (!ride) {
+      return next(errorHandler(404, 'Ride not found'));
+    }
+    
+    // Check if the user has permission to cancel this ride
+    // User must be either the creator or a passenger
+    const userId = req.user._id.toString();
+    const isCreator = ride.createdBy && ride.createdBy.toString() === userId;
+    const isPassenger = ride.passengers && ride.passengers.some(p => 
+      (p.user && p.user.toString() === userId) || 
+      (p.email === req.user.email)
+    );
+    
+    if (!isCreator && !isPassenger) {
+      return next(errorHandler(403, 'You do not have permission to cancel this ride'));
+    }
+    
+    // Check if the ride can be cancelled (only scheduled or pending rides can be cancelled)
+    if (ride.status !== 'scheduled' && ride.status !== 'pending') {
+      return next(errorHandler(400, `Cannot cancel a ride with status: ${ride.status}`));
+    }
+    
+    // Update the ride status to cancelled
+    ride.status = 'cancelled';
+    await ride.save();
+    
+    res.status(200).json({ 
+      success: true, 
+      message: 'Ride has been cancelled successfully'
+    });
+    
+  } catch (error) {
+    console.error('Error cancelling ride:', error);
+    next(error);
+  }
+};
+
+// Book a ride with multiple seats
+export const bookRide = async (req, res, next) => {
+  try {
+    const { rideId } = req.params;
+    const { bookedSeats = 1 } = req.body;
+    
+    console.log(`Booking ride ${rideId} with ${bookedSeats} seats for user:`, req.user);
+    
+    if (!mongoose.Types.ObjectId.isValid(rideId)) {
+      return next(errorHandler(400, 'Invalid ride ID format'));
+    }
+    
+    const ride = await Ride.findById(rideId);
+    
+    if (!ride) {
+      return next(errorHandler(404, 'Ride not found'));
+    }
+    
+    // Check ride status
+    if (ride.status !== 'scheduled') {
+      return next(errorHandler(400, `Cannot book a ride with status '${ride.status}'. Only scheduled rides can be booked.`));
+    }
+    
+    // Check if user is trying to book their own ride
+    if (
+      (ride.createdBy && req.user._id && ride.createdBy.toString() === req.user._id.toString()) || 
+      (ride.email && req.user.email && ride.email === req.user.email)
+    ) {
+      return next(errorHandler(400, 'You cannot book your own ride'));
+    }
+    
+    // Check if user is already a passenger
+    const isAlreadyPassenger = ride.passengers.some(
+      passenger => 
+        (passenger.user && passenger.user.toString() === req.user._id.toString()) || 
+        (passenger.email && passenger.email === req.user.email)
+    );
+    
+    if (isAlreadyPassenger) {
+      return next(errorHandler(400, 'You have already booked this ride'));
+    }
+    
+    // Validate there are enough seats available
+    if (bookedSeats > ride.leftSeats) {
+      return next(errorHandler(400, `Cannot book ${bookedSeats} seats. Only ${ride.leftSeats} seats are available.`));
+    }
+    
+    // Add user as passenger
+    ride.passengers.push({
+      user: req.user._id,
+      seats: parseInt(bookedSeats, 10),
+      status: 'confirmed',
+      email: req.user.email,
+      name: req.user.username || `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'Guest'
+    });
+    
+    // Update leftSeats
+    ride.leftSeats = Math.max(0, ride.leftSeats - parseInt(bookedSeats, 10));
+    
+    console.log('Updated ride:', {
+      leftSeats: ride.leftSeats,
+      passengers: ride.passengers.length
+    });
+    
+    // Save the updated ride
+    await ride.save();
+    
+    res.status(200).json({
+      success: true,
+      message: `Successfully booked ${bookedSeats} seat(s) for the ride`,
+      ride: {
+        _id: ride._id,
+        source: ride.source,
+        destination: ride.destination,
+        date: ride.date,
+        departureTime: ride.departureTime,
+        price: ride.price,
+        leftSeats: ride.leftSeats,
+        status: ride.status
+      }
+    });
+  } catch (error) {
+    console.error('Error booking ride:', error);
+    if (error.name === 'CastError') {
+      return next(errorHandler(400, 'Invalid data format'));
+    }
     next(error);
   }
 };

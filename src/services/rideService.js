@@ -178,5 +178,79 @@ export const rideService = {
       }
       throw error;
     }
+  },
+  
+  // Book a ride with specific number of seats
+  async bookRide(rideId, bookingData) {
+    try {
+      console.log(`Booking ride ${rideId} with data:`, bookingData);
+      const response = await api.post(`/rides/${rideId}/book`, bookingData);
+      return response.data;
+    } catch (error) {
+      console.error('Error booking ride:', error);
+      // Get the specific error message if available
+      const errorMessage = error.response?.data?.message || 
+                         error.message || 
+                         'Failed to book ride';
+      throw new Error(errorMessage);
+    }
+  },
+  
+  async getAvailableRides(filters = {}) {
+    try {
+      // Add timestamp to prevent caching issues
+      const params = { 
+        ...filters,
+        _t: new Date().getTime()  // Add timestamp to avoid caching
+      };
+      
+      console.log('Fetching available rides with params:', params);
+      const response = await api.get('/rides/available', { params });
+      
+      // Check if response contains rides data
+      if (!response.data || !response.data.rides) {
+        console.warn('No rides data in response for available rides:', response);
+        return [];
+      }
+      
+      // Log the number of rides found
+      console.log(`Received ${response.data.rides.length} available rides`);
+      
+      // Return empty array if no rides found
+      return response.data.rides || [];
+    } catch (error) {
+      console.error('Error fetching available rides:', error);
+      
+      // Check for network error
+      if (!error.response) {
+        throw new Error('Network error. Please check your connection and try again.');
+      }
+      
+      // Handle specific error codes
+      if (error.response?.status === 401) {
+        throw new Error('Please sign in to view available rides');
+      }
+      
+      // Get the specific error message from the backend if available
+      const errorMessage = error.response?.data?.message || 
+                         error.message || 
+                         'Failed to fetch available rides';
+      throw new Error(errorMessage);
+    }
+  },
+  
+  // Cancel a ride
+  async cancelRide(rideId) {
+    try {
+      console.log(`Cancelling ride ${rideId}`);
+      const response = await api.put(`/rides/cancel/${rideId}`, {});
+      return response.data;
+    } catch (error) {
+      console.error('Error cancelling ride:', error);
+      const errorMessage = error.response?.data?.message || 
+                         error.message || 
+                         'Failed to cancel ride';
+      throw new Error(errorMessage);
+    }
   }
 };

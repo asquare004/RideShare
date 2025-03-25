@@ -1,16 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 function SearchForm({ onSearch }) {
   // Get today's date in YYYY-MM-DD format for min attribute
   const today = new Date().toISOString().split('T')[0];
+  
+  // Local state for form values
+  const [formValues, setFormValues] = useState({
+    source: '',
+    destination: '',
+    date: ''
+  });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // Call onSearch immediately with updated values
+    
+    // Update local state
+    setFormValues(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Call onSearch with all current values
     onSearch({
-      source: name === 'source' ? value : document.querySelector('input[name="source"]').value,
-      destination: name === 'destination' ? value : document.querySelector('input[name="destination"]').value,
-      date: name === 'date' ? value : document.querySelector('input[name="date"]').value
+      ...formValues,
+      [name]: value
     });
   };
 
@@ -22,6 +35,7 @@ function SearchForm({ onSearch }) {
           <input 
             type="text" 
             name="source"
+            value={formValues.source}
             placeholder="Search by any part of address" 
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -33,6 +47,7 @@ function SearchForm({ onSearch }) {
           <input 
             type="text" 
             name="destination"
+            value={formValues.destination}
             placeholder="Search by any part of address" 
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -44,6 +59,7 @@ function SearchForm({ onSearch }) {
           <input 
             type="date" 
             name="date"
+            value={formValues.date}
             min={today}
             onChange={handleChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"

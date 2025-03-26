@@ -1,0 +1,10 @@
+{
+  "name": "ride-share-frontend",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix homepage\" \"npm run dev --prefix RideShare-driver\" \"npm run dev --prefix RideShare-passenger\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

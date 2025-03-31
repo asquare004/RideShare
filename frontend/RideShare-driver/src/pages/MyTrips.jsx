@@ -8,6 +8,8 @@ function MyTrips() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('current');
+  const [selectedTrip, setSelectedTrip] = useState(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const { currentUser } = useSelector(state => state.user);
   const navigate = useNavigate();
 
@@ -52,16 +54,17 @@ function MyTrips() {
       const data = await response.json();
       console.log(`Received ${data.length} trips:`, data);
 
-      // Filter trips based on activeTab
-      let filteredTrips = data;
+      // Filter trips based on activeTab and driver ID
+      let filteredTrips = data.filter(trip => trip.driverId === currentUser._id);
+      
       if (activeTab === 'current') {
         // Filter for trips with status 'ongoing' or 'in_progress'
-        filteredTrips = data.filter(trip => 
+        filteredTrips = filteredTrips.filter(trip => 
           trip.status === 'ongoing' || trip.status === 'in_progress'
         );
       }
       
-      console.log(`Filtered ${filteredTrips.length} ${activeTab} trips:`, filteredTrips);
+      console.log(`Filtered ${filteredTrips.length} ${activeTab} trips for driver ${currentUser._id}:`, filteredTrips);
       setTrips(filteredTrips);
     } catch (err) {
       console.error(`Error fetching ${activeTab} trips:`, err);
@@ -83,13 +86,31 @@ function MyTrips() {
     });
   };
 
-  const cancelTrip = async (tripId) => {
+  const handleViewDetails = (trip) => {
+    setSelectedTrip(trip);
+    setShowDetailsModal(true);
+  };
+
+  const handleCancelRide = async (tripId) => {
     try {
+      // Show confirmation dialog
+      const confirmed = window.confirm(
+        'Are you sure you want to cancel this trip? This action cannot be undone.'
+      );
+      
+      if (!confirmed) {
+        return;
+      }
+
+      // Proceed with cancellation
       const response = await fetch(`/api/driver/trips/cancel/${tripId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          driverId: currentUser._id
+        }),
         credentials: 'include'
       });
 
@@ -106,6 +127,36 @@ function MyTrips() {
     } catch (err) {
       console.error('Error canceling trip:', err);
       toast.error(err.message || 'Failed to cancel trip. Please try again.');
+    }
+  };
+
+  const handleStartRide = async (tripId) => {
+    try {
+      const response = await fetch(`/api/driver/trips/start/${tripId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to start trip');
+      }
+
+      // Update the trip status in the list
+      setTrips(trips.map(trip => 
+        trip._id === tripId 
+          ? { ...trip, status: 'ongoing' }
+          : trip
+      ));
+      
+      // Show success message
+      toast.success('Trip started successfully');
+    } catch (err) {
+      console.error('Error starting trip:', err);
+      toast.error(err.message || 'Failed to start trip. Please try again.');
     }
   };
 
@@ -510,6 +561,141 @@ function MyTrips() {
           </div>
         </div>
       </div>
+
+      {/* Trip Details Modal */}
+      {showDetailsModal && selectedTrip && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-xl font-semibold text-gray-900">Trip Details</h3>
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Trip Status */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Status</span>
+                  {getStatusBadge(selectedTrip.status)}
+                </div>
+
+                {/* Route Details */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Route</h4>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-500">From</p>
+                      <p className="font-medium text-gray-900">{selectedTrip.source}</p>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-500">To</p>
+                      <p className="font-medium text-gray-900">{selectedTrip.destination}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Trip Details */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Date & Time</h4>
+                    <p className="text-sm text-gray-900">
+                      {new Date(selectedTrip.date).toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                    <p className="text-sm text-gray-500">{selectedTrip.departureTime}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Distance</h4>
+                    <p className="text-sm text-gray-900">{selectedTrip.distance} km</p>
+                  </div>
+                </div>
+
+                {/* Price Details */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Price Details</h4>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">Price per seat</span>
+                      <span className="text-sm font-medium text-gray-900">₹{selectedTrip.price}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-sm text-gray-500">Total seats</span>
+                      <span className="text-sm font-medium text-gray-900">{selectedTrip.totalSeats}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-sm text-gray-500">Available seats</span>
+                      <span className="text-sm font-medium text-gray-900">{selectedTrip.leftSeats}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
+                      <span className="text-sm font-medium text-gray-900">Total earnings</span>
+                      <span className="text-sm font-medium text-green-600">
+                        ₹{selectedTrip.price * (selectedTrip.totalSeats - selectedTrip.leftSeats)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Passenger List */}
+                {selectedTrip.passengers && selectedTrip.passengers.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Passengers</h4>
+                    <div className="space-y-2">
+                      {selectedTrip.passengers.map((passenger, index) => (
+                        <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{passenger.name}</p>
+                            <p className="text-xs text-gray-500">{passenger.phone}</p>
+                          </div>
+                          {passenger.rating && (
+                            <div className="flex items-center">
+                              <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                              <span className="text-sm ml-1 text-gray-600">{passenger.rating}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-6 flex space-x-3">
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                >
+                  Close
+                </button>
+                {selectedTrip.status !== 'cancelled' && selectedTrip.status !== 'completed' && (
+                  <button
+                    onClick={() => handleCancelRide(selectedTrip._id)}
+                    className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                  >
+                    Cancel Trip
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

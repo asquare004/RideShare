@@ -7,7 +7,7 @@ function MyTrips() {
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('upcoming');
+  const [activeTab, setActiveTab] = useState('current');
   const { currentUser } = useSelector(state => state.user);
   const navigate = useNavigate();
 
@@ -23,9 +23,18 @@ function MyTrips() {
   const fetchTrips = async () => {
     setLoading(true);
     try {
-      const endpoint = activeTab === 'upcoming' 
-        ? '/api/driver/trips/upcoming' 
-        : '/api/driver/trips/past';
+      let endpoint;
+      switch(activeTab) {
+        case 'current':
+        case 'upcoming':
+          endpoint = '/api/driver/trips/upcoming';
+          break;
+        case 'past':
+          endpoint = '/api/driver/trips/past';
+          break;
+        default:
+          endpoint = '/api/driver/trips/upcoming';
+      }
       
       console.log(`Fetching trips from: ${endpoint}`);
       
@@ -41,8 +50,19 @@ function MyTrips() {
       }
 
       const data = await response.json();
-      console.log(`Received ${data.length} ${activeTab} trips:`, data);
-      setTrips(data);
+      console.log(`Received ${data.length} trips:`, data);
+
+      // Filter trips based on activeTab
+      let filteredTrips = data;
+      if (activeTab === 'current') {
+        // Filter for trips with status 'ongoing' or 'in_progress'
+        filteredTrips = data.filter(trip => 
+          trip.status === 'ongoing' || trip.status === 'in_progress'
+        );
+      }
+      
+      console.log(`Filtered ${filteredTrips.length} ${activeTab} trips:`, filteredTrips);
+      setTrips(filteredTrips);
     } catch (err) {
       console.error(`Error fetching ${activeTab} trips:`, err);
       setError(`Failed to load ${activeTab} trips. Please try again later.`);
@@ -408,6 +428,16 @@ function MyTrips() {
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8 px-4">
               <button
+                onClick={() => setActiveTab('current')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'current'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Current Trips
+              </button>
+              <button
                 onClick={() => setActiveTab('upcoming')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'upcoming'
@@ -441,8 +471,36 @@ function MyTrips() {
                 <p className="text-red-600">{error}</p>
               </div>
             ) : trips.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600">No trips found.</p>
+              <div className="text-center py-12">
+                <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-gray-50 mb-4">
+                  {activeTab === 'current' ? (
+                    <svg className="h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  ) : activeTab === 'upcoming' ? (
+                    <svg className="h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  ) : (
+                    <svg className="h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  )}
+                </div>
+                <p className="text-gray-700 text-xl font-semibold">
+                  {activeTab === 'current' 
+                    ? 'No active trips at the moment'
+                    : activeTab === 'upcoming'
+                    ? 'No upcoming trips scheduled'
+                    : 'No past trips found'}
+                </p>
+                <p className="text-gray-500 text-sm mt-3 max-w-sm mx-auto">
+                  {activeTab === 'current'
+                    ? 'Your active trips will appear here when you start a ride'
+                    : activeTab === 'upcoming'
+                    ? 'Your scheduled trips will appear here when you create or accept a ride'
+                    : 'Your completed trips will appear here after you finish a ride'}
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

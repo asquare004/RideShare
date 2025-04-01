@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -12,6 +12,7 @@ function MyTrips() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const { currentUser } = useSelector(state => state.user);
   const navigate = useNavigate();
+  const activeTabRef = useRef(null);
 
   useEffect(() => {
     if (!currentUser) {
@@ -19,28 +20,82 @@ function MyTrips() {
       return;
     }
     
+    // Debug function to check driver authentication
+    const checkDriverAuth = async () => {
+      try {
+        const baseUrl = process.env.NODE_ENV === 'development' 
+          ? 'http://localhost:5000' 
+          : '';
+        
+        // Check driver authentication cookies
+        console.log('Current cookies:', document.cookie);
+        
+        // Check if we have redux state for driver
+        console.log('Current user from Redux:', currentUser);
+        
+        // Test the basic driver endpoint
+        const testResponse = await fetch(`${baseUrl}/api/driver/session-info`, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
+        });
+        
+        console.log('Driver session info response:', testResponse.status);
+        if (testResponse.ok) {
+          const data = await testResponse.json();
+          console.log('Driver session data:', data);
+        } else {
+          console.error('Failed to get driver session info');
+        }
+      } catch (err) {
+        console.error('Error checking driver auth:', err);
+      }
+    };
+    
+    // Run auth check only on initial load
+    if (!activeTabRef.current) {
+      checkDriverAuth();
+    }
+    
+    // Keep track of tab changes
+    activeTabRef.current = activeTab;
+    
+    // Log the current tab
+    console.log('Current active tab:', activeTab);
+    
+    // Fetch trips based on the current tab
     fetchTrips();
   }, [currentUser, activeTab]);
 
   const fetchTrips = async () => {
     setLoading(true);
     try {
+      // Use the correct base URL if in development environment
+      const baseUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:5000' 
+        : '';
+      
+      // Determine the endpoint based on activeTab
       let endpoint;
       switch(activeTab) {
         case 'current':
+          endpoint = '/api/driver/trips/status/ongoing';
+          break;
         case 'upcoming':
-          endpoint = '/api/driver/trips/upcoming';
+          endpoint = '/api/driver/trips/status/scheduled';
           break;
         case 'past':
-          endpoint = '/api/driver/trips/past';
+          endpoint = '/api/driver/trips/status/completed';
           break;
         default:
-          endpoint = '/api/driver/trips/upcoming';
+          endpoint = '/api/driver/trips/status/scheduled';
       }
       
-      console.log(`Fetching trips from: ${endpoint}`);
+      const fullUrl = `${baseUrl}${endpoint}`;
+      console.log(`Fetching trips from: ${fullUrl}`);
       
-      const response = await fetch(endpoint, {
+      const response = await fetch(fullUrl, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -48,26 +103,14 @@ function MyTrips() {
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch ${activeTab} trips`);
+        throw new Error(`Failed to fetch ${activeTab} trips: ${response.status}`);
       }
 
       const data = await response.json();
       console.log(`Received ${data.length} trips:`, data);
-
-      // Filter trips based on activeTab and driver ID
-      let filteredTrips = data.filter(trip => trip.driverId === currentUser._id);
-      
-      if (activeTab === 'current') {
-        // Filter for trips with status 'ongoing' or 'in_progress'
-        filteredTrips = filteredTrips.filter(trip => 
-          trip.status === 'ongoing' || trip.status === 'in_progress'
-        );
-      }
-      
-      console.log(`Filtered ${filteredTrips.length} ${activeTab} trips for driver ${currentUser._id}:`, filteredTrips);
-      setTrips(filteredTrips);
+      setTrips(data);
     } catch (err) {
-      console.error(`Error fetching ${activeTab} trips:`, err);
+      console.error(`Error in fetchTrips for ${activeTab} tab:`, err);
       setError(`Failed to load ${activeTab} trips. Please try again later.`);
     } finally {
       setLoading(false);
@@ -102,8 +145,13 @@ function MyTrips() {
         return;
       }
 
+      // Use the correct base URL if in development environment
+      const baseUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:5000' 
+        : '';
+
       // Proceed with cancellation
-      const response = await fetch(`/api/driver/trips/cancel/${tripId}`, {
+      const response = await fetch(`${baseUrl}/api/driver/trips/cancel/${tripId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,8 +163,12 @@ function MyTrips() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to cancel trip');
+        if (response.headers.get('content-type')?.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to cancel trip');
+        } else {
+          throw new Error(`Failed to cancel trip: ${response.status} ${response.statusText}`);
+        }
       }
 
       // Remove the canceled trip from the list
@@ -132,31 +184,95 @@ function MyTrips() {
 
   const handleStartRide = async (tripId) => {
     try {
-      const response = await fetch(`/api/driver/trips/start/${tripId}`, {
-        method: 'POST',
+      // Use the correct base URL
+      const baseUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:5000' 
+        : '';
+      
+      console.log('Starting ride with ID:', tripId);
+      
+      // Update the ride status directly in the database
+      const updateResponse = await fetch(`${baseUrl}/api/rides/${tripId}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          status: 'ongoing'
+        }),
         credentials: 'include'
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to start trip');
-      }
-
-      // Update the trip status in the list
-      setTrips(trips.map(trip => 
-        trip._id === tripId 
-          ? { ...trip, status: 'ongoing' }
-          : trip
-      ));
       
-      // Show success message
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        console.error('Error response:', errorText);
+        throw new Error('Failed to start ride');
+      }
+      
       toast.success('Trip started successfully');
+      
+      // If we're on the upcoming tab, remove this trip from the list
+      if (activeTab === 'upcoming') {
+        setTrips(prevTrips => prevTrips.filter(trip => trip._id !== tripId));
+      }
+      
+      // Switch to the current tab
+      setActiveTab('current');
+      
+      // Wait a moment and then reload the page to ensure we get fresh data
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
     } catch (err) {
       console.error('Error starting trip:', err);
       toast.error(err.message || 'Failed to start trip. Please try again.');
+    }
+  };
+
+  const handleEndRide = async (tripId) => {
+    try {
+      // Use the correct base URL
+      const baseUrl = process.env.NODE_ENV === 'development' 
+        ? 'http://localhost:5000' 
+        : '';
+      
+      console.log('Ending ride with ID:', tripId);
+      
+      // Update the ride status directly in the database
+      const updateResponse = await fetch(`${baseUrl}/api/rides/${tripId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'completed'
+        }),
+        credentials: 'include'
+      });
+      
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        console.error('Error response:', errorText);
+        throw new Error('Failed to end ride');
+      }
+      
+      toast.success('Trip completed successfully');
+      
+      // If we're on the current tab, remove this trip from the list
+      if (activeTab === 'current') {
+        setTrips(prevTrips => prevTrips.filter(trip => trip._id !== tripId));
+      }
+      
+      // Switch to the past tab
+      setActiveTab('past');
+      
+      // Wait a moment and then reload the page to ensure we get fresh data
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (err) {
+      console.error('Error ending trip:', err);
+      toast.error(err.message || 'Failed to end trip. Please try again.');
     }
   };
 
@@ -434,29 +550,42 @@ function MyTrips() {
               View Details
             </button>
             
-            {trip.status !== 'cancelled' && trip.status !== 'completed' && (
-              <>
-                <button
-                  onClick={() => handleStartRide(trip._id)}
-                  className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  Start Ride
-                </button>
-                
-                <button
-                  onClick={() => handleCancelRide(trip._id)}
-                  className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  Cancel Ride
-                </button>
-              </>
+            {trip.status === 'scheduled' && (
+              <button
+                onClick={() => handleStartRide(trip._id)}
+                className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Start Ride
+              </button>
+            )}
+            
+            {trip.status === 'ongoing' && (
+              <button
+                onClick={() => handleEndRide(trip._id)}
+                className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                </svg>
+                End Ride
+              </button>
+            )}
+            
+            {(trip.status === 'scheduled' || trip.status === 'pending') && (
+              <button
+                onClick={() => handleCancelRide(trip._id)}
+                className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Cancel Ride
+              </button>
             )}
           </div>
         </div>

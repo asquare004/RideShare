@@ -808,3 +808,83 @@ export const bookRide = async (req, res, next) => {
     next(error);
   }
 };
+
+// Start a ride
+export const startRide = async (req, res, next) => {
+  try {
+    const { rideId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(rideId)) {
+      return next(errorHandler(400, 'Invalid ride ID format'));
+    }
+    
+    const ride = await Ride.findById(rideId);
+    
+    if (!ride) {
+      return next(errorHandler(404, 'Ride not found'));
+    }
+    
+    // Check if the user is the driver
+    if (ride.driverId.toString() !== req.user._id.toString()) {
+      return next(errorHandler(403, 'Only the assigned driver can start the ride'));
+    }
+    
+    // Check if the ride is in a valid state to be started
+    if (ride.status !== 'scheduled') {
+      return next(errorHandler(400, `Cannot start a ride with status: ${ride.status}. Only scheduled rides can be started.`));
+    }
+    
+    // Update the ride status to ongoing
+    ride.status = 'ongoing';
+    await ride.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Ride has been started successfully',
+      ride
+    });
+    
+  } catch (error) {
+    next(error);
+  }
+};
+
+// End a ride
+export const endRide = async (req, res, next) => {
+  try {
+    const { rideId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(rideId)) {
+      return next(errorHandler(400, 'Invalid ride ID format'));
+    }
+    
+    const ride = await Ride.findById(rideId);
+    
+    if (!ride) {
+      return next(errorHandler(404, 'Ride not found'));
+    }
+    
+    // Check if the user is the driver
+    if (ride.driverId.toString() !== req.user._id.toString()) {
+      return next(errorHandler(403, 'Only the assigned driver can end the ride'));
+    }
+    
+    // Check if the ride is in a valid state to be ended
+    if (ride.status !== 'ongoing') {
+      return next(errorHandler(400, `Cannot end a ride with status: ${ride.status}. Only ongoing rides can be ended.`));
+    }
+    
+    // Update the ride status to completed
+    ride.status = 'completed';
+    await ride.save();
+    
+    res.status(200).json({
+      success: true,
+      message: 'Ride has been completed successfully',
+      ride
+    });
+    
+  } catch (error) {
+    next(error);
+  }
+};

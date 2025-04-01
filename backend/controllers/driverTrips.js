@@ -312,4 +312,70 @@ export const respondToPassengerRequest = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+// Get ongoing trips for the current driver
+export const getDriverOngoingTrips = async (req, res, next) => {
+  try {
+    const driverId = req.driver.id;
+    console.log('Getting ongoing trips for driver ID:', driverId);
+    
+    const ongoingRides = await Ride.find({
+      $or: [
+        { driverId: driverId },
+        { driver: driverId }
+      ],
+      status: 'ongoing'
+    }).sort({ date: 1, departureTime: 1 });
+    
+    console.log(`Found ${ongoingRides.length} ongoing trips for driver:`, ongoingRides);
+    res.status(200).json(ongoingRides);
+  } catch (error) {
+    console.error('Error getting ongoing trips:', error);
+    next(error);
+  }
+};
+
+// Get scheduled trips for the current driver
+export const getDriverScheduledTrips = async (req, res, next) => {
+  try {
+    const driverId = req.driver.id;
+    console.log('Getting scheduled trips for driver ID:', driverId);
+    
+    const scheduledRides = await Ride.find({
+      $or: [
+        { driverId: driverId },
+        { driver: driverId }
+      ],
+      status: 'scheduled'
+    }).sort({ date: 1, departureTime: 1 });
+    
+    console.log(`Found ${scheduledRides.length} scheduled trips for driver:`, scheduledRides);
+    res.status(200).json(scheduledRides);
+  } catch (error) {
+    console.error('Error getting scheduled trips:', error);
+    next(error);
+  }
+};
+
+// Get completed trips for the current driver
+export const getDriverCompletedTrips = async (req, res, next) => {
+  try {
+    const driverId = req.driver.id;
+    console.log('Getting completed trips for driver ID:', driverId);
+    
+    const completedRides = await Ride.find({
+      $or: [
+        { driverId: driverId },
+        { driver: driverId }
+      ],
+      status: { $in: ['completed', 'cancelled'] }
+    }).sort({ date: -1, departureTime: -1 });
+    
+    console.log(`Found ${completedRides.length} completed/cancelled trips for driver:`, completedRides);
+    res.status(200).json(completedRides);
+  } catch (error) {
+    console.error('Error getting completed trips:', error);
+    next(error);
+  }
 }; 

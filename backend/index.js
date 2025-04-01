@@ -18,14 +18,20 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: true, // Allow requests from any origin
+  origin: ['http://localhost:5174', 'http://localhost:5173'],
   credentials: true,
-  exposedHeaders: ['set-cookie'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+  exposedHeaders: ['set-cookie']
 }));
 app.use(express.json());
 app.use(cookieParser());
+
+// Add request logging middleware
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 // Routes
 app.use('/api/rides', ridesRouter);
@@ -33,6 +39,12 @@ app.use('/api/user-rides', userRidesRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
 app.use('/api/driver', driverRouter);
+
+// 404 handler
+app.use((req, res) => {
+  console.log(`404 - Not Found: ${req.method} ${req.path}`);
+  res.status(404).json({ message: 'Route not found' });
+});
 
 // MongoDB connection with improved options
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/rideshare', {
@@ -97,6 +109,7 @@ app.use((req, res, next) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+  console.error('Error:', err);
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
   res.status(statusCode).json({

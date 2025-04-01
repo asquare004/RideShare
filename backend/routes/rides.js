@@ -13,8 +13,12 @@ import {
   getRideById,
   getAvailableRides,
   cancelRide,
-  bookRide
+  bookRide,
+  startRide,
+  endRide
 } from '../controllers/ride.js';
+import Ride from '../models/Ride.js';
+import { errorHandler } from '../utils/error.js';
 
 const router = express.Router();
 
@@ -42,8 +46,37 @@ router.put('/cancel/:rideId', verifyToken, cancelRide);
 // Get a single ride by ID
 router.get('/:rideId', getRideById);
 
-// Update ride
-router.put('/:rideId', verifyToken, updateRide);
+// Update ride status or details
+router.put('/:rideId', verifyToken, async (req, res, next) => {
+  try {
+    const ride = await Ride.findById(req.params.rideId);
+    
+    if (!ride) {
+      return next(errorHandler(404, 'Ride not found'));
+    }
+    
+    // If status is being updated
+    if (req.body.status) {
+      ride.status = req.body.status;
+    }
+    
+    // If other fields are being updated
+    if (req.body.source) ride.source = req.body.source;
+    if (req.body.destination) ride.destination = req.body.destination;
+    if (req.body.date) ride.date = req.body.date;
+    if (req.body.departureTime) ride.departureTime = req.body.departureTime;
+    if (req.body.price) ride.price = req.body.price;
+    if (req.body.totalSeats) ride.totalSeats = req.body.totalSeats;
+    if (req.body.leftSeats) ride.leftSeats = req.body.leftSeats;
+    if (req.body.distance) ride.distance = req.body.distance;
+    
+    await ride.save();
+    
+    res.status(200).json({ success: true, ride });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Delete ride
 router.delete('/:rideId', verifyToken, deleteRide);
@@ -56,5 +89,11 @@ router.post('/:rideId/book', verifyToken, bookRide);
 
 // Cancel a booking
 router.post('/:rideId/cancel', verifyToken, cancelBooking);
+
+// Start a ride
+router.post('/:rideId/start', verifyDriver, startRide);
+
+// End a ride
+router.post('/:rideId/end', verifyDriver, endRide);
 
 export default router;

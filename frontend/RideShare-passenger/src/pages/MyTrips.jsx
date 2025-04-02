@@ -394,7 +394,7 @@ function MyTrips() {
                 p.user === currentUser._id || 
                 (p.user && p.user._id === currentUser._id)
               ) || false,
-              paymentStatus: 'completed' // Set payment status to completed after successful payment
+              paymentStatus: ride._id === rideToPayFor.id ? 'completed' : userPassenger?.paymentStatus || 'pending' // Update only the specific ride's payment status
             };
           });
           

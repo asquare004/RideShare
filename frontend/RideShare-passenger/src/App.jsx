@@ -23,28 +23,27 @@ import 'react-toastify/dist/ReactToastify.css';
 function App() {
   return (
     <BrowserRouter>
-    <div className="min-h-screen bg-gray-50">
-    <Navbar></Navbar>
-      <Routes>
-       
-        <Route path='/' element={<RideSearch />} />
-        <Route path='/create-ride' element={<RideCreate />} />
-        <Route path='/profile' element={<Profile />} />
-        <Route path='/search' element={<RideSearch />} />
-        <Route path='/book-ride' element={<RideCreate />} />
-        <Route path='/sign-in' element={<SignIn />} />
-        <Route path='/sign-up' element={<SignUp />} />
-        <Route path='/my-trips' element={<MyTrips />} />
-        <Route path='/find-driver' element={<FindDriver />} />
-        <Route path='/finding-driver/:rideId' element={<FindingDriver />} />
-        <Route path='/ride-confirmation' element={<RideConfirmation />} />
-        <Route path='/ride/:rideId' element={<RideDetail />} />
-        <Route path='/upcoming-trips' element={<UpcomingTrips />} />
-        <Route path='/history' element={<History />} />
-        <Route path='/booking-details' element={<BookingDetails />} />
-      </Routes>
-      <ToastContainer position="bottom-right" autoClose={5000} />
-    </div>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar></Navbar>
+        <Routes>
+          <Route path='/' element={<RideSearch />} />
+          <Route path='/create-ride' element={<RideCreate />} />
+          <Route path='/profile' element={<Profile />} />
+          <Route path='/search' element={<RideSearch />} />
+          <Route path='/book-ride' element={<RideCreate />} />
+          <Route path='/sign-in' element={<SignIn />} />
+          <Route path='/sign-up' element={<SignUp />} />
+          <Route path='/my-trips' element={<MyTrips />} />
+          <Route path='/find-driver' element={<FindDriver />} />
+          <Route path='/finding-driver/:rideId' element={<FindingDriver />} />
+          <Route path='/ride-confirmation' element={<RideConfirmation />} />
+          <Route path='/ride/:rideId' element={<RideDetail />} />
+          <Route path='/upcoming-trips' element={<UpcomingTrips />} />
+          <Route path='/history' element={<History />} />
+          <Route path='/booking-details' element={<BookingDetails />} />
+        </Routes>
+        <ToastContainer position="bottom-right" autoClose={5000} />
+      </div>
     </BrowserRouter>
   );
 }

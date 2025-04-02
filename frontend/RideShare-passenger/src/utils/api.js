@@ -4,11 +4,13 @@ import { signOutSuccess } from '../redux/user/userSlice';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: 'http://localhost:5000/api/',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
-  }
+  },
+  // Increase timeout for debugging
+  timeout: 10000
 });
 
 // Add request interceptor to handle authentication
@@ -23,7 +25,9 @@ api.interceptors.request.use(
       config.headers['Authorization'] = `Bearer ${token}`;
     }
 
-    console.log('API Request config:', {
+    // Enhanced logging for debugging
+    console.log('API Request:', {
+      fullUrl: `${config.baseURL}${config.url}`,
       url: config.url,
       method: config.method,
       headers: config.headers,
@@ -50,6 +54,7 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('API Response error:', {
+      fullUrl: error.config?.baseURL + error.config?.url,
       url: error.config?.url,
       status: error.response?.status,
       data: error.response?.data,

@@ -8,6 +8,7 @@ import authRouter from './routes/auth.js';
 import userRouter from './routes/user.js';
 import driverRouter from './routes/driver.js';
 import ratingRouter from './routes/rating.js';
+import paymentRouter from './routes/payment.js';
 import path from 'path';
 import cors from 'cors';
 import Ride from './models/Ride.js';
@@ -42,6 +43,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
 app.use('/api/driver', driverRouter);
 app.use('/api/ratings', ratingRouter);
+app.use('/api/payments', paymentRouter);
 
 // Debug route - add this before the 404 handler
 app.get('/api/debug/routes', (req, res) => {
@@ -95,8 +97,18 @@ app.use((req, res) => {
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('Connected to MongoDB');
+    
+    // Check if Stripe is configured
+    if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY) {
+      console.log('Stripe is configured with secret key and publishable key');
+    } else {
+      console.warn('Stripe is not properly configured. Missing keys in .env file');
+    }
+    
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
+      console.log(`API is available at http://localhost:${PORT}/api`);
+      console.log(`Payment API is available at http://localhost:${PORT}/api/payments`);
     });
   })
   .catch((err) => {

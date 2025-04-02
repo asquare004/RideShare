@@ -5,6 +5,7 @@ import { rideService } from '../services/rideService';
 import { ratingService } from '../services/ratingService';
 import { FaStar, FaRegStar } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import PaymentModal from '../components/PaymentModal';
 
 function MyTrips() {
   const navigate = useNavigate();
@@ -23,6 +24,30 @@ function MyTrips() {
   const [selectedRide, setSelectedRide] = useState(null);
   const [ratingValue, setRatingValue] = useState(0);
   const [comment, setComment] = useState('');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [rideToPayFor, setRideToPayFor] = useState(null);
+
+  // Add the fetchRatings function
+  const fetchRatings = async () => {
+    if (!currentUser || !currentUser._id) return;
+    
+    try {
+      // Get ratings for completed rides
+      const response = await ratingService.getUserRatings(currentUser._id);
+      if (response && response.ratings) {
+        const ratingsMap = {};
+        response.ratings.forEach(rating => {
+          if (rating.rideId) {
+            ratingsMap[rating.rideId] = rating.value;
+          }
+        });
+        setRatings(ratingsMap);
+      }
+    } catch (error) {
+      console.error('Error fetching ratings:', error);
+      // Don't show error toast as this is not critical
+    }
+  };
 
   useEffect(() => {
     const fetchUserTrips = async () => {
@@ -55,119 +80,122 @@ function MyTrips() {
         
         // Format rides
         const formattedRides = rides.map(ride => {
-          // Use the userRole information from the backend
-          const { isDriver, isPassenger, bookedSeats } = ride.userRole || {};
-
-          console.log('Processing ride:', {
-            id: ride._id,
-            isDriver,
-            isPassenger,
-            status: ride.status,
-            date: ride.date,
-            time: ride.departureTime
-          });
+          // Find the current user's passenger record in this ride
+          const userPassenger = ride.passengers?.find(p => 
+            p.user === currentUser._id || 
+            (p.user && p.user._id === currentUser._id)
+          );
           
+          // Comprehensive driver info extraction
+          let driverInfo = {
+            id: ride._id || 'unknown',
+            name: 'Unknown Driver',
+            rating: 0,
+            profilePicture: ''
+          };
+          
+          // First check if the current user is the creator/driver
+          const isCreator = (ride.creatorId === currentUser._id) || 
+                          (ride.creator && ride.creator._id === currentUser._id) ||
+                          (ride.driverId === currentUser._id) || 
+                          (ride.driverId && ride.driverId._id === currentUser._id);
+          
+          if (isCreator) {
+            // Current user is the driver
+            driverInfo = {
+              id: currentUser._id,
+              name: 'You (Driver)',
+              rating: currentUser.rating || 0,
+              profilePicture: currentUser.profilePicture || ''
+            };
+          } else {
+            // Try to extract driver info from various possible fields
+            
+            // Check for driverId as object (populated)
+            if (ride.driverId && typeof ride.driverId === 'object') {
+              driverInfo = {
+                id: ride.driverId._id || ride.driverId.id || 'unknown',
+                name: ride.driverId.firstName ? 
+                     `${ride.driverId.firstName} ${ride.driverId.lastName || ''}` : 
+                     (ride.driverId.name || ride.driverId.username || 'Unknown Driver'),
+                rating: ride.driverId.rating || 0,
+                profilePicture: ride.driverId.profilePicture || ''
+              };
+            }
+            // Check for driver field (populated)
+            else if (ride.driver && typeof ride.driver === 'object') {
+              driverInfo = {
+                id: ride.driver._id || ride.driver.id || 'unknown',
+                name: ride.driver.firstName ? 
+                     `${ride.driver.firstName} ${ride.driver.lastName || ''}` : 
+                     (ride.driver.name || ride.driver.username || 'Unknown Driver'),
+                rating: ride.driver.rating || 0,
+                profilePicture: ride.driver.profilePicture || ''
+              };
+            }
+            // Check for driverInfo field (populated)
+            else if (ride.driverInfo && typeof ride.driverInfo === 'object') {
+              driverInfo = {
+                id: ride.driverInfo._id || ride.driverInfo.id || 'unknown',
+                name: ride.driverInfo.firstName ? 
+                     `${ride.driverInfo.firstName} ${ride.driverInfo.lastName || ''}` : 
+                     (ride.driverInfo.name || ride.driverInfo.username || 'Unknown Driver'),
+                rating: ride.driverInfo.rating || 0,
+                profilePicture: ride.driverInfo.profilePicture || ''
+              };
+            }
+            // Check for creator field (populated)
+            else if (ride.creator && typeof ride.creator === 'object') {
+              driverInfo = {
+                id: ride.creator._id || ride.creator.id || 'unknown',
+                name: ride.creator.firstName ? 
+                     `${ride.creator.firstName} ${ride.creator.lastName || ''}` : 
+                     (ride.creator.name || ride.creator.username || 'Unknown Driver'),
+                rating: ride.creator.rating || 0,
+                profilePicture: ride.creator.profilePicture || ''
+              };
+            }
+          }
+          
+          // Format the ride data for display
           return {
             id: ride._id,
             from: ride.source,
             to: ride.destination,
-            date: ride.date,
+            date: ride.date.split('T')[0],
             time: ride.departureTime,
             price: ride.price,
-            seats: bookedSeats || ride.leftSeats,
-            distance: ride.distance,
-            driver: {
-              name: isDriver ? 'You' : (ride.driverInfo ? `${ride.driverInfo.firstName} ${ride.driverInfo.lastName}` : 'Driver'),
-              rating: isDriver ? (currentUser.rating || '4.8') : (ride.driverInfo ? ride.driverInfo.rating : '4.8')
-            },
-            driverInfo: ride.driverInfo,
-            isCreator: isDriver,
-            isPassenger,
-            status: ride.status || 'scheduled',
+            seats: ride.leftSeats,
             totalSeats: ride.totalSeats || 4,
-            leftSeats: ride.leftSeats
+            bookedSeats: userPassenger?.seats || 1,
+            distance: ride.distance,
+            status: ride.status || 'scheduled',
+            driver: driverInfo,
+            isCreator,
+            isPassenger: ride.passengers?.some(p => 
+              p.user === currentUser._id || 
+              (p.user && p.user._id === currentUser._id)
+            ) || false,
+            paymentStatus: userPassenger?.paymentStatus || 'pending'
           };
         });
+
+        // Update states with the processed ride data
+        updateTripStates(formattedRides);
         
-        console.log('Formatted rides:', formattedRides.length);
-        
-        // Split rides into current, upcoming and completed
-        const current = [];
-        const upcoming = [];
-        const completed = [];
-        
-        formattedRides.forEach(trip => {
-          const rideDateTime = new Date(`${trip.date}T${trip.time}`);
-          const rideDate = new Date(rideDateTime.getFullYear(), rideDateTime.getMonth(), rideDateTime.getDate());
-          
-          if (trip.status === 'completed' || trip.status === 'cancelled') {
-            completed.push(trip);
-          } else if (trip.status === 'ongoing') {
-            current.push(trip);
-          } else if (trip.status === 'scheduled' || trip.status === 'pending') {
-            // Check if the ride is today
-            if (rideDate.getTime() === today.getTime()) {
-              upcoming.push(trip);
-            } else if (rideDateTime > currentDate) {
-              upcoming.push(trip);
-            } else {
-              completed.push({...trip, status: 'completed'});
-            }
-          }
-        });
-        
-        // Sort by time for current rides
-        current.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
-        
-        // Sort by date
-        upcoming.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
-        completed.sort((a, b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
-        
-        console.log('Upcoming rides:', upcoming.length);
-        console.log('Completed rides:', completed.length);
-        
-        setCurrentRides(current);
-        setUpcomingRides(upcoming);
-        setCompletedRides(completed);
-        
-        // Set stats - only count non-cancelled rides
-        setCreatedRides(formattedRides.filter(r => r.isCreator && r.status !== 'cancelled'));
-        setJoinedRides(formattedRides.filter(r => r.isPassenger && r.status !== 'cancelled'));
+        // Fetch ratings for completed rides
+        fetchRatings();
         
         setLoading(false);
-      } catch (err) {
-        console.error('Error fetching trips:', err);
-        setError(err.response?.data?.message || 'Failed to load your trips. Please try again later.');
+      } catch (error) {
+        console.error('Error fetching user trips:', error);
+        setError(error.message || 'Error loading trips. Please try again.');
         setLoading(false);
       }
     };
 
     fetchUserTrips();
   }, [currentUser, navigate]);
-
-  // Fetch ratings for past rides
-  useEffect(() => {
-    const fetchRatings = async () => {
-      if (completedRides.length > 0) {
-        const ratingsMap = {};
-        for (const ride of completedRides) {
-          try {
-            const rating = await ratingService.getUserRating(ride.id);
-            if (rating) {
-              ratingsMap[ride.id] = rating;
-            }
-          } catch (error) {
-            console.error('Error fetching rating for ride:', ride.id, error);
-          }
-        }
-        setRatings(ratingsMap);
-      }
-    };
-
-    if (activeTab === 'completed') {
-      fetchRatings();
-    }
-  }, [completedRides, activeTab]);
 
   const handleViewDetails = (trip) => {
     const rideData = {
@@ -249,6 +277,176 @@ function MyTrips() {
     } catch (error) {
       toast.error(error.message || 'Failed to submit rating');
     }
+  };
+
+  const handlePaymentClick = (trip) => {
+    setRideToPayFor(trip);
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    setShowPaymentModal(false);
+    setRideToPayFor(null);
+    toast.success('Payment successful! Your ride is now confirmed.');
+    
+    // Refresh trip data
+    if (currentUser && currentUser._id) {
+      rideService.getUserRides().then(response => {
+        if (response.success) {
+          // Re-process the rides data with the updated payment information
+          const rides = response.rides || [];
+          
+          // Process rides similar to fetchUserTrips
+          // This ensures the UI updates with the new payment status
+          const currentDate = new Date();
+          const formattedRides = rides.map(ride => {
+            const userPassenger = ride.passengers?.find(p => 
+              p.user === currentUser._id || 
+              (p.user && p.user._id === currentUser._id)
+            );
+            
+            // Comprehensive driver info extraction
+            let driverInfo = {
+              id: ride._id || 'unknown',
+              name: 'Unknown Driver',
+              rating: 0,
+              profilePicture: ''
+            };
+            
+            // First check if the current user is the creator/driver
+            const isCreator = (ride.creatorId === currentUser._id) || 
+                            (ride.creator && ride.creator._id === currentUser._id) ||
+                            (ride.driverId === currentUser._id) || 
+                            (ride.driverId && ride.driverId._id === currentUser._id);
+            
+            if (isCreator) {
+              // Current user is the driver
+              driverInfo = {
+                id: currentUser._id,
+                name: 'You (Driver)',
+                rating: currentUser.rating || 0,
+                profilePicture: currentUser.profilePicture || ''
+              };
+            } else {
+              // Try to extract driver info from various possible fields
+              
+              // Check for driverId as object (populated)
+              if (ride.driverId && typeof ride.driverId === 'object') {
+                driverInfo = {
+                  id: ride.driverId._id || ride.driverId.id || 'unknown',
+                  name: ride.driverId.firstName ? 
+                       `${ride.driverId.firstName} ${ride.driverId.lastName || ''}` : 
+                       (ride.driverId.name || ride.driverId.username || 'Unknown Driver'),
+                  rating: ride.driverId.rating || 0,
+                  profilePicture: ride.driverId.profilePicture || ''
+                };
+              }
+              // Check for driver field (populated)
+              else if (ride.driver && typeof ride.driver === 'object') {
+                driverInfo = {
+                  id: ride.driver._id || ride.driver.id || 'unknown',
+                  name: ride.driver.firstName ? 
+                       `${ride.driver.firstName} ${ride.driver.lastName || ''}` : 
+                       (ride.driver.name || ride.driver.username || 'Unknown Driver'),
+                  rating: ride.driver.rating || 0,
+                  profilePicture: ride.driver.profilePicture || ''
+                };
+              }
+              // Check for driverInfo field (populated)
+              else if (ride.driverInfo && typeof ride.driverInfo === 'object') {
+                driverInfo = {
+                  id: ride.driverInfo._id || ride.driverInfo.id || 'unknown',
+                  name: ride.driverInfo.firstName ? 
+                       `${ride.driverInfo.firstName} ${ride.driverInfo.lastName || ''}` : 
+                       (ride.driverInfo.name || ride.driverInfo.username || 'Unknown Driver'),
+                  rating: ride.driverInfo.rating || 0,
+                  profilePicture: ride.driverInfo.profilePicture || ''
+                };
+              }
+              // Check for creator field (populated)
+              else if (ride.creator && typeof ride.creator === 'object') {
+                driverInfo = {
+                  id: ride.creator._id || ride.creator.id || 'unknown',
+                  name: ride.creator.firstName ? 
+                       `${ride.creator.firstName} ${ride.creator.lastName || ''}` : 
+                       (ride.creator.name || ride.creator.username || 'Unknown Driver'),
+                  rating: ride.creator.rating || 0,
+                  profilePicture: ride.creator.profilePicture || ''
+                };
+              }
+            }
+            
+            return {
+              id: ride._id,
+              from: ride.source,
+              to: ride.destination,
+              date: ride.date.split('T')[0],
+              time: ride.departureTime,
+              price: ride.price,
+              seats: ride.leftSeats,
+              totalSeats: ride.totalSeats || 4,
+              bookedSeats: userPassenger?.seats || 1,
+              distance: ride.distance,
+              status: ride.status || 'scheduled',
+              driver: driverInfo,
+              isCreator,
+              isPassenger: ride.passengers?.some(p => 
+                p.user === currentUser._id || 
+                (p.user && p.user._id === currentUser._id)
+              ) || false,
+              paymentStatus: 'completed' // Set payment status to completed after successful payment
+            };
+          });
+          
+          // Update state with the fresh data
+          updateTripStates(formattedRides);
+        }
+      });
+    }
+  };
+  
+  // Helper function to update trip states
+  const updateTripStates = (formattedRides) => {
+    const currentDate = new Date();
+    const today = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    
+    // Separate into current, upcoming, and completed
+    const upcoming = [];
+    const completed = [];
+    const current = [];
+    
+    // Categorize rides
+    formattedRides.forEach(trip => {
+      const rideDateTime = new Date(`${trip.date}T${trip.time}`);
+      const rideDate = new Date(rideDateTime.getFullYear(), rideDateTime.getMonth(), rideDateTime.getDate());
+      
+      if (trip.status === 'completed' || trip.status === 'cancelled') {
+        completed.push(trip);
+      } else if (trip.status === 'ongoing') {
+        current.push(trip);
+      } else if (trip.status === 'scheduled' || trip.status === 'pending') {
+        // Check if the ride is today
+        if (rideDate.getTime() === today.getTime()) {
+          current.push({ ...trip, status: 'ongoing' });
+        } else if (rideDateTime > currentDate) {
+          upcoming.push(trip);
+        } else {
+          completed.push({...trip, status: 'completed'});
+        }
+      }
+    });
+    
+    // Sort the arrays
+    current.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+    upcoming.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+    completed.sort((a, b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
+    
+    // Update state
+    setCurrentRides(current);
+    setUpcomingRides(upcoming);
+    setCompletedRides(completed);
+    setCreatedRides(formattedRides.filter(r => r.isCreator && r.status !== 'cancelled'));
+    setJoinedRides(formattedRides.filter(r => r.isPassenger && !r.isCreator && r.status !== 'cancelled'));
   };
 
   if (loading) {
@@ -586,6 +784,357 @@ function MyTrips() {
     );
   };
 
+  // Modify the renderCurrentTrip function to include the green Pay Now button
+  const renderCurrentTrip = (trip) => {
+    return (
+      <div 
+        key={trip.id}
+        className={`bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 ${getBorderColor(trip.status)} border-l-4`}
+      >
+        {/* Trip Header */}
+        <div className="bg-gray-50 p-4 border-b border-gray-100">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-2">
+              <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded">
+                {trip.distance} km
+              </span>
+              <span className="bg-purple-100 text-purple-800 text-xs px-2.5 py-1 rounded-full flex items-center">
+                <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Ongoing
+              </span>
+              
+              {/* Payment Status Badge */}
+              {trip.isPassenger && (
+                <span className={`text-xs px-2.5 py-1 rounded-full flex items-center ${
+                  trip.paymentStatus === 'completed' 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth="2" 
+                      d={trip.paymentStatus === 'completed' 
+                        ? "M5 13l4 4L19 7" // Checkmark for completed
+                        : "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"} // Clock for pending
+                    />
+                  </svg>
+                  {trip.paymentStatus === 'completed' ? 'Paid' : 'Payment Pending'}
+                </span>
+              )}
+            </div>
+          </div>
+          
+          <div className="mt-3">
+            <div className="flex items-center space-x-2">
+              <div className="flex-1">
+                <p className="text-xs text-gray-500 mb-1">From</p>
+                <p className="font-medium text-gray-900 truncate">{trip.from.split(',')[0]}</p>
+              </div>
+              <div className="flex-shrink-0">
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-gray-500 mb-1">To</p>
+                <p className="font-medium text-gray-900 truncate">{trip.to.split(',')[0]}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Trip Details */}
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            {/* Date and Time */}
+            <div className="flex items-start">
+              <div className="p-2 bg-blue-50 rounded-lg mr-3">
+                <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Date & Time</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {new Date(trip.date).toLocaleDateString('en-US', { 
+                    weekday: 'short',
+                    month: 'short', 
+                    day: 'numeric'
+                  })}
+                </p>
+                <p className="text-sm text-gray-600">{trip.time}</p>
+              </div>
+            </div>
+            
+            {/* Price */}
+            <div className="flex items-start">
+              <div className="p-2 bg-green-50 rounded-lg mr-3">
+                <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Price per seat</p>
+                <p className="text-sm font-medium text-green-600">₹{trip.price}</p>
+                <p className="text-xs text-gray-600">
+                  Total: ₹{trip.price * (trip.bookedSeats || 1)}
+                </p>
+              </div>
+            </div>
+            
+            {/* Driver/Passenger Info */}
+            <div className="flex items-start">
+              <div className="p-2 bg-gray-100 rounded-lg mr-3">
+                <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">{trip.isCreator ? 'You are the driver' : 'Driver'}</p>
+                <div className="flex items-center">
+                  <p className="text-sm font-medium">{trip.driver.name}</p>
+                  {!trip.isCreator && trip.driver.rating && (
+                    <div className="flex items-center ml-2">
+                      <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                      <span className="text-sm ml-1 text-gray-600">{trip.driver.rating}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex space-x-2 pt-3 border-t border-gray-100">
+            <button
+              onClick={() => handleViewDetails(trip)}
+              className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              View Details
+            </button>
+            
+            {trip.isPassenger && trip.paymentStatus === 'pending' && (
+              <button
+                onClick={() => handlePaymentClick(trip)}
+                className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Pay Now
+              </button>
+            )}
+            
+            {trip.isPassenger && trip.paymentStatus === 'completed' && (
+              <div className="flex-1 bg-gray-100 text-gray-700 py-2.5 px-4 rounded-lg text-sm font-medium flex items-center justify-center">
+                <svg className="w-4 h-4 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+                Paid
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Add a specific renderUpcomingTrip function for the upcoming trips tab
+  const renderUpcomingTrip = (trip) => {
+    // Calculate booked seats
+    const totalSeats = trip.totalSeats || 4;
+    const bookedSeats = totalSeats - (trip.leftSeats || 0);
+    
+    return (
+      <div 
+        key={trip.id}
+        className={`bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 ${getBorderColor(trip.status)} border-l-4`}
+      >
+        {/* Trip Header */}
+        <div className="bg-gray-50 p-4 border-b border-gray-100">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-2">
+              <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded">
+                {trip.distance} km
+              </span>
+              {getStatusBadge(trip.status)}
+              {trip.isCreator ? (
+                <span className="bg-purple-100 text-purple-800 text-xs px-2.5 py-1 rounded-full flex items-center">
+                  <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Driver
+                </span>
+              ) : (
+                <span className="bg-indigo-100 text-indigo-800 text-xs px-2.5 py-1 rounded-full flex items-center">
+                  <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  Passenger
+                </span>
+              )}
+            </div>
+          </div>
+          
+          <div className="mt-3">
+            <div className="flex items-center space-x-2">
+              <div className="flex-1">
+                <p className="text-xs text-gray-500 mb-1">From</p>
+                <p className="font-medium text-gray-900 truncate">{trip.from.split(',')[0]}</p>
+              </div>
+              <div className="flex-shrink-0">
+                <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-gray-500 mb-1">To</p>
+                <p className="font-medium text-gray-900 truncate">{trip.to.split(',')[0]}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Trip Details */}
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            {/* Date and Time */}
+            <div className="flex items-start">
+              <div className="p-2 bg-blue-50 rounded-lg mr-3">
+                <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Date & Time</p>
+                <p className="text-sm font-medium text-gray-900">
+                  {new Date(trip.date).toLocaleDateString('en-US', { 
+                    weekday: 'short',
+                    month: 'short', 
+                    day: 'numeric'
+                  })}
+                </p>
+                <p className="text-sm text-gray-600">{trip.time}</p>
+              </div>
+            </div>
+            
+            {/* Price */}
+            <div className="flex items-start">
+              <div className="p-2 bg-green-50 rounded-lg mr-3">
+                <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Price per seat</p>
+                <p className="text-sm font-medium text-green-600">₹{trip.price}</p>
+                {trip.isCreator && (
+                  <p className="text-xs text-gray-600">
+                    Total: ₹{trip.price * bookedSeats}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            {/* Seats */}
+            <div className="flex items-start">
+              <div className="p-2 bg-purple-50 rounded-lg mr-3">
+                <svg className="w-5 h-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Seats Booked</p>
+                <div className="flex items-center mt-1">
+                  <div className="flex-1">
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium">{bookedSeats}/{totalSeats}</span>
+                      <div className="ml-2 flex space-x-1">
+                        {[...Array(totalSeats)].map((_, i) => (
+                          <div
+                            key={i}
+                            className={`w-2 h-2 rounded-full ${
+                              i < bookedSeats ? 'bg-purple-500' : 'bg-gray-200'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {trip.isCreator 
+                        ? `${bookedSeats} passenger${bookedSeats !== 1 ? 's' : ''} booked`
+                        : `${totalSeats - bookedSeats} seat${totalSeats - bookedSeats !== 1 ? 's' : ''} left`
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Driver/Passenger Info */}
+            <div className="flex items-start">
+              <div className="p-2 bg-gray-100 rounded-lg mr-3">
+                <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">{trip.isCreator ? 'You are the driver' : 'Driver'}</p>
+                <div className="flex items-center">
+                  <p className="text-sm font-medium">{trip.driver.name}</p>
+                  {!trip.isCreator && trip.driver.rating && (
+                    <div className="flex items-center ml-2">
+                      <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                      <span className="text-sm ml-1 text-gray-600">{trip.driver.rating}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex space-x-2 pt-3 border-t border-gray-100">
+            <button
+              onClick={() => handleViewDetails(trip)}
+              className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              View Details
+            </button>
+            
+            {trip.status !== 'cancelled' && (
+              <button
+                onClick={() => handleCancelRide(trip.id)}
+                className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Cancel Ride
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto px-4 pt-24 pb-12">
       <h1 className="text-3xl font-bold text-gray-800 mb-2">My Trips</h1>
@@ -700,141 +1249,7 @@ function MyTrips() {
                 </div>
               ) : (
                 <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {currentRides.map(trip => (
-                    <div 
-                      key={trip.id}
-                      className={`bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all duration-300 ${getBorderColor(trip.status)} border-l-4`}
-                    >
-                      {/* Trip Header */}
-                      <div className="bg-gray-50 p-4 border-b border-gray-100">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center space-x-2">
-                            <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded">
-                              {trip.distance} km
-                            </span>
-                            <span className="bg-purple-100 text-purple-800 text-xs px-2.5 py-1 rounded-full flex items-center">
-                              <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                              </svg>
-                              Ongoing
-                            </span>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-3">
-                          <div className="flex items-center space-x-2">
-                            <div className="flex-1">
-                              <p className="text-xs text-gray-500 mb-1">From</p>
-                              <p className="font-medium text-gray-900 truncate">{trip.from.split(',')[0]}</p>
-                            </div>
-                            <div className="flex-shrink-0">
-                              <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                              </svg>
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-xs text-gray-500 mb-1">To</p>
-                              <p className="font-medium text-gray-900 truncate">{trip.to.split(',')[0]}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Trip Details */}
-                      <div className="p-4">
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          {/* Date and Time */}
-                          <div className="flex items-start">
-                            <div className="p-2 bg-blue-50 rounded-lg mr-3">
-                              <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500">Date & Time</p>
-                              <p className="text-sm font-medium text-gray-900">
-                                {new Date(trip.date).toLocaleDateString('en-US', { 
-                                  weekday: 'short',
-                                  month: 'short', 
-                                  day: 'numeric'
-                                })}
-                              </p>
-                              <p className="text-sm text-gray-600">{trip.time}</p>
-                            </div>
-                          </div>
-                          
-                          {/* Price */}
-                          <div className="flex items-start">
-                            <div className="p-2 bg-green-50 rounded-lg mr-3">
-                              <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500">Price per seat</p>
-                              <p className="text-sm font-medium text-green-600">₹{trip.price}</p>
-                              {!trip.isCreator && (
-                                <p className="text-xs text-gray-600">
-                                  {trip.seats} seat{trip.seats !== 1 ? 's' : ''}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {/* Driver Info */}
-                          <div className="flex items-start col-span-2">
-                            <div className="p-2 bg-gray-100 rounded-lg mr-3">
-                              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                              </svg>
-                            </div>
-                            <div>
-                              <p className="text-xs text-gray-500">{trip.isCreator ? 'You are the driver' : 'Driver'}</p>
-                              <div className="flex items-center">
-                                <p className="text-sm font-medium">{trip.driver.name}</p>
-                                {!trip.isCreator && trip.driver.rating && (
-                                  <div className="flex items-center ml-2">
-                                    <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                    </svg>
-                                    <span className="text-sm ml-1 text-gray-600">{trip.driver.rating}</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Action Buttons for Current Trips */}
-                        <div className="flex space-x-2 pt-3 border-t border-gray-100">
-                          <button
-                            onClick={() => handleViewDetails(trip)}
-                            className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
-                          >
-                            <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            View Details
-                          </button>
-                          
-                          {!trip.isCreator && (
-                            <button
-                              onClick={() => {
-                                alert('Payment functionality will be implemented in future updates.');
-                              }}
-                              className="flex-1 bg-green-50 hover:bg-green-100 text-green-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
-                            >
-                              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                              </svg>
-                              Pay Now
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  {currentRides.map(trip => renderCurrentTrip(trip))}
                 </div>
               )}
             </>
@@ -870,7 +1285,7 @@ function MyTrips() {
                 </div>
               ) : (
                 <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {upcomingRides.map(trip => renderRideCard(trip))}
+                  {upcomingRides.map(trip => renderUpcomingTrip(trip))}
                 </div>
               )}
             </>
@@ -906,6 +1321,33 @@ function MyTrips() {
         </div>
       </div>
       
+      {/* Login Modal */}
+      {showLoginModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full text-center">
+            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <h3 className="text-lg font-medium text-gray-900 mt-4">Authentication Required</h3>
+            <p className="text-sm text-gray-500 mt-2">Please sign in to view your trips</p>
+            <div className="mt-5">
+              <button
+                onClick={handleLogin}
+                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => navigate('/')}
+                className="w-full mt-3 bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition"
+              >
+                Go to Homepage
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Rating Modal */}
       {showRatingModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -968,6 +1410,15 @@ function MyTrips() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Payment Modal - Only render when showPaymentModal is true */}
+      {showPaymentModal && rideToPayFor && (
+        <PaymentModal
+          ride={rideToPayFor}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={handlePaymentSuccess}
+        />
       )}
     </div>
   );

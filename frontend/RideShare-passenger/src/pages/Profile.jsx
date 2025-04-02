@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { userService } from '../services/userService';
+import { rideService } from '../services/rideService';
 import { useSelector } from 'react-redux';
-import { FaUser, FaStar, FaEnvelope, FaCar, FaCalendarAlt, FaMapMarkerAlt } from 'react-icons/fa';
+import { FaUser, FaStar, FaEnvelope, FaCar, FaCalendarAlt, FaMapMarkerAlt, FaRoute, FaHistory } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -15,8 +16,16 @@ function Profile() {
     memberSince: '',
     favoriteRoutes: []
   });
+  const [recentTrips, setRecentTrips] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [tripLoading, setTripLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [stats, setStats] = useState({
+    totalTrips: 0,
+    createdTrips: 0,
+    joinedTrips: 0,
+    completedTrips: 0
+  });
   
   const { currentUser } = useSelector((state) => state.user);
 
@@ -35,7 +44,7 @@ function Profile() {
         console.log("Profile data received:", userData);
         
         setUserProfile({
-          username: userData.username || '',
+          username: userData.username || userData.firstName + ' ' + userData.lastName || '',
           email: userData.email || '',
           profilePicture: userData.profilePicture || '',
           rating: userData.rating || 0,
@@ -51,20 +60,75 @@ function Profile() {
       }
     };
 
+    const fetchUserTrips = async () => {
+      try {
+        setTripLoading(true);
+        const response = await rideService.getUserRides();
+        
+        if (!response.success) {
+          throw new Error(response.message || 'Failed to fetch rides');
+        }
+        
+        const rides = response.rides || [];
+        
+        // Calculate stats
+        const created = rides.filter(ride => 
+          ride.creatorId === currentUser._id || 
+          (ride.creator && ride.creator._id === currentUser._id)
+        ).length;
+        
+        const joined = rides.filter(ride => {
+          if (ride.creatorId === currentUser._id || (ride.creator && ride.creator._id === currentUser._id)) {
+            return false;
+          }
+          return ride.passengers && ride.passengers.some(p => 
+            (p.user?._id === currentUser._id) || (p.user === currentUser._id)
+          );
+        }).length;
+        
+        const completed = rides.filter(ride => ride.status === 'completed').length;
+        
+        setStats({
+          totalTrips: rides.length,
+          createdTrips: created,
+          joinedTrips: joined,
+          completedTrips: completed
+        });
+        
+        // Get recent trips
+        const recent = rides
+          .sort((a, b) => new Date(b.date) - new Date(a.date))
+          .slice(0, 3);
+          
+        setRecentTrips(recent);
+        setTripLoading(false);
+      } catch (err) {
+        console.error("Error fetching user trips:", err);
+        setTripLoading(false);
+      }
+    };
+
     if (currentUser) {
       fetchUserProfile();
+      fetchUserTrips();
     } else {
       setLoading(false);
       setError('Please sign in to view your profile');
     }
   }, [currentUser]);
 
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto px-8 pt-20 pb-8">
+      <div className="min-h-screen bg-gray-50 pt-16">
+        <div className="container mx-auto px-8 py-8">
           <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
           </div>
         </div>
       </div>
@@ -73,8 +137,8 @@ function Profile() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto px-8 pt-20 pb-8">
+      <div className="min-h-screen bg-gray-50 pt-16">
+        <div className="container mx-auto px-8 py-8">
           <div className="bg-white rounded-xl shadow-sm p-8 max-w-md mx-auto">
             <div className="text-center">
               <div className="mb-6">
@@ -83,7 +147,7 @@ function Profile() {
               <h3 className="text-xl font-medium text-gray-900 mb-2">Profile Not Available</h3>
               <p className="text-gray-600 mb-6">{error}</p>
               {!currentUser && (
-                <Link to="/sign-in" className="inline-block w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg text-center transition duration-200">
+                <Link to="/sign-in" className="inline-block w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-medium rounded-lg text-center transition duration-200">
                   Sign In
                 </Link>
               )}
@@ -95,15 +159,15 @@ function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-8 pt-20 pb-8">
+    <div className="min-h-screen bg-gray-50 pt-16">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-xl shadow-sm overflow-hidden"
+          className="bg-white rounded-xl shadow-lg overflow-hidden"
         >
           {/* Profile Header */}
-          <div className="relative h-32 bg-gradient-to-r from-indigo-400 to-purple-400">
+          <div className="relative h-32 bg-gradient-to-r from-blue-600 to-blue-800">
             <div className="absolute -bottom-12 left-8">
               <div className="relative">
                 <div className="w-24 h-24 rounded-full ring-4 ring-white overflow-hidden bg-white">
@@ -137,68 +201,121 @@ function Profile() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <div className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:border-yellow-300 transition-colors">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <motion.div
+                whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:shadow-md transition-all duration-300"
+              >
                 <div className="flex items-center justify-center text-yellow-400 mb-2">
-                  <span className="text-3xl font-bold text-gray-800">{userProfile.rating.toFixed(1)}</span>
+                  <span className="text-3xl font-bold text-gray-800">{userProfile.rating?.toFixed(1) || '0.0'}</span>
                   <FaStar className="w-6 h-6 ml-1" />
                 </div>
                 <p className="text-sm text-gray-500">Rating</p>
-              </div>
+              </motion.div>
               
-              <div className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:border-indigo-300 transition-colors">
+              <motion.div
+                whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:shadow-md transition-all duration-300"
+              >
                 <div className="flex items-center justify-center mb-2">
-                  <span className="text-3xl font-bold text-gray-800">{userProfile.totalRides}</span>
-                  <FaCar className="w-6 h-6 ml-2 text-indigo-400" />
+                  <span className="text-3xl font-bold text-gray-800">{tripLoading ? '...' : stats.totalTrips}</span>
+                  <FaCar className="w-6 h-6 ml-2 text-blue-500" />
                 </div>
-                <p className="text-sm text-gray-500">Total Rides</p>
-              </div>
+                <p className="text-sm text-gray-500">Total Trips</p>
+              </motion.div>
               
-              <div className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:border-purple-300 transition-colors">
+              <motion.div
+                whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:shadow-md transition-all duration-300"
+              >
                 <div className="flex items-center justify-center mb-2">
-                  <FaCalendarAlt className="w-5 h-5 mr-2 text-purple-400" />
-                  <span className="text-lg font-semibold text-gray-800">
-                    {new Date(userProfile.memberSince).toLocaleDateString('en-US', { 
-                      month: 'long',
-                      year: 'numeric'
-                    })}
-                  </span>
+                  <span className="text-3xl font-bold text-gray-800">{tripLoading ? '...' : stats.createdTrips}</span>
+                  <FaRoute className="w-6 h-6 ml-2 text-blue-600" />
                 </div>
-                <p className="text-sm text-gray-500">Member Since</p>
-              </div>
+                <p className="text-sm text-gray-500">Created Trips</p>
+              </motion.div>
+              
+              <motion.div
+                whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:shadow-md transition-all duration-300"
+              >
+                <div className="flex items-center justify-center mb-2">
+                  <span className="text-3xl font-bold text-gray-800">{tripLoading ? '...' : stats.joinedTrips}</span>
+                  <FaHistory className="w-6 h-6 ml-2 text-blue-700" />
+                </div>
+                <p className="text-sm text-gray-500">Joined Trips</p>
+              </motion.div>
             </div>
 
             {/* Recent Activity */}
-            <div className="bg-gray-50 rounded-lg p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Activity</h2>
-              <div className="space-y-4">
-                {userProfile.favoriteRoutes.length > 0 ? (
-                  userProfile.favoriteRoutes.map((route, index) => (
-                    <div key={index} className="flex items-start space-x-3 bg-white p-4 rounded-lg border border-gray-100 hover:border-indigo-200 transition-colors">
-                      <FaMapMarkerAlt className="w-5 h-5 text-indigo-400 mt-1" />
-                      <div>
-                        <p className="font-medium text-gray-800">{route.name}</p>
-                        <p className="text-sm text-gray-500">{route.description}</p>
+            <div className="bg-gray-50 rounded-lg p-6 mb-8">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Trips</h2>
+              {tripLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+                </div>
+              ) : recentTrips.length > 0 ? (
+                <div className="space-y-4">
+                  {recentTrips.map((trip, index) => (
+                    <motion.div 
+                      key={trip._id || index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex items-start space-x-3 bg-white p-4 rounded-lg border border-gray-100 hover:border-blue-300 hover:shadow-sm transition-all duration-300"
+                    >
+                      <FaMapMarkerAlt className="w-5 h-5 text-blue-500 mt-1 flex-shrink-0" />
+                      <div className="flex-grow">
+                        <p className="font-medium text-gray-800">{trip.source} to {trip.destination}</p>
+                        <div className="flex justify-between items-center mt-1">
+                          <p className="text-sm text-gray-500">{formatDate(trip.date)}</p>
+                          <span className={`text-xs px-2 py-1 rounded-full ${
+                            trip.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                            trip.status === 'cancelled' ? 'bg-red-100 text-red-800' : 
+                            'bg-blue-100 text-blue-800'
+                          }`}>
+                            {trip.status?.charAt(0).toUpperCase() + trip.status?.slice(1)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-gray-500 text-center py-4">No recent activity to show</p>
-                )}
-              </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No recent trips to show</p>
+                  <Link 
+                    to="/" 
+                    className="mt-4 inline-block px-6 py-2 bg-blue-50 text-blue-600 rounded-lg font-medium hover:bg-blue-100 transition-colors"
+                  >
+                    Find your first ride
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Member Since */}
+            <div className="flex items-center justify-center mb-8">
+              <FaCalendarAlt className="w-5 h-5 mr-2 text-gray-400" />
+              <span className="text-sm text-gray-500">
+                Member since {new Date(userProfile.memberSince).toLocaleDateString('en-US', { 
+                  month: 'long',
+                  year: 'numeric'
+                })}
+              </span>
             </div>
 
             {/* Quick Actions */}
-            <div className="mt-8 flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
               <Link 
                 to="/" 
-                className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-6 py-3 rounded-lg text-center font-medium hover:from-indigo-600 hover:to-purple-600 transition-all duration-300 shadow-sm hover:shadow"
+                className="flex-1 bg-gradient-to-r from-blue-500 to-blue-700 text-white px-6 py-3 rounded-lg text-center font-medium hover:from-blue-600 hover:to-blue-800 transition-all duration-300 shadow-sm hover:shadow"
               >
                 Find a Ride
               </Link>
               <Link 
                 to="/my-trips" 
-                className="flex-1 bg-white text-indigo-600 px-6 py-3 rounded-lg text-center font-medium border border-indigo-200 hover:bg-indigo-50 hover:border-indigo-300 transition-all duration-300"
+                className="flex-1 bg-white text-blue-600 px-6 py-3 rounded-lg text-center font-medium border border-blue-200 hover:bg-blue-50 hover:border-blue-300 transition-all duration-300"
               >
                 View My Trips
               </Link>

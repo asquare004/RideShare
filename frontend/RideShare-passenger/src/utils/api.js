@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { store } from '../redux/store';
+import { signOutSuccess } from '../redux/user/userSlice';
 
 // Create axios instance with base configuration
 const api = axios.create({
@@ -30,17 +31,15 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle errors
+// Add response interceptor to handle 401 errors
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    // Handle 401 errors
     if (error.response?.status === 401) {
-      // Clear Redux store if needed
-      // store.dispatch(signOutSuccess());
-      console.error('Authentication error:', error.response?.data);
+      // Dispatch sign out action
+      store.dispatch(signOutSuccess());
+      // Redirect to sign in page
+      window.location.href = '/sign-in';
     }
     return Promise.reject(error);
   }

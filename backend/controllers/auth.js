@@ -60,10 +60,11 @@ export const signin = async (req, res, next) => {
       .status(200)
       .cookie('access_token', token, {
         httpOnly: true,
-        sameSite: 'lax',
+        sameSite: 'none',
         secure: process.env.NODE_ENV === 'production',
         maxAge: 24 * 60 * 60 * 1000,
-        path: '/'
+        path: '/',
+        domain: process.env.NODE_ENV === 'production' ? '.rideshare.com' : 'localhost'
       })
       .json({ ...rest, token });
   } catch (error) {
@@ -85,10 +86,11 @@ export const google = async (req, res, next) => {
         .status(200)
         .cookie('access_token', token, {
           httpOnly: true,
-          sameSite: 'lax',
+          sameSite: 'none',
           secure: process.env.NODE_ENV === 'production',
           maxAge: 24 * 60 * 60 * 1000,
-          path: '/'
+          path: '/',
+          domain: process.env.NODE_ENV === 'production' ? '.rideshare.com' : 'localhost'
         })
         .json({ ...rest, token });
     } else {
@@ -115,10 +117,11 @@ export const google = async (req, res, next) => {
         .status(200)
         .cookie('access_token', token, {
           httpOnly: true,
-          sameSite: 'lax',
+          sameSite: 'none',
           secure: process.env.NODE_ENV === 'production',
           maxAge: 24 * 60 * 60 * 1000,
-          path: '/'
+          path: '/',
+          domain: process.env.NODE_ENV === 'production' ? '.rideshare.com' : 'localhost'
         })
         .json({ ...rest, token });
     }

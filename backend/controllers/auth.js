@@ -60,11 +60,10 @@ export const signin = async (req, res, next) => {
       .status(200)
       .cookie('access_token', token, {
         httpOnly: true,
-        sameSite: 'none',
-        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        secure: false,
         maxAge: 24 * 60 * 60 * 1000,
-        path: '/',
-        domain: process.env.NODE_ENV === 'production' ? '.rideshare.com' : 'localhost'
+        path: '/'
       })
       .json({ ...rest, token });
   } catch (error) {

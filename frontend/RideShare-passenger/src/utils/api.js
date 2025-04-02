@@ -18,8 +18,12 @@ api.interceptors.request.use(
     const state = store.getState();
     const token = state.user?.currentUser?.token;
     
-    // If token exists, add it to headers
-    if (token) {
+    // Check for cookie
+    const cookies = document.cookie.split(';').map(cookie => cookie.trim());
+    const hasAuthCookie = cookies.some(cookie => cookie.startsWith('access_token='));
+    
+    // If no cookie but we have a token in Redux, add it to headers
+    if (!hasAuthCookie && token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
 

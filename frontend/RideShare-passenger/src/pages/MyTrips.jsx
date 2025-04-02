@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { rideService } from '../services/rideService';
+import { ratingService } from '../services/ratingService';
+import { FaStar, FaRegStar } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 
 function MyTrips() {
   const navigate = useNavigate();
@@ -15,6 +18,11 @@ function MyTrips() {
   const [joinedRides, setJoinedRides] = useState([]);
   const [activeTab, setActiveTab] = useState('current');
   const [currentRides, setCurrentRides] = useState([]);
+  const [ratings, setRatings] = useState({});
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedRide, setSelectedRide] = useState(null);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [comment, setComment] = useState('');
 
   useEffect(() => {
     const fetchUserTrips = async () => {
@@ -137,6 +145,30 @@ function MyTrips() {
     fetchUserTrips();
   }, [currentUser, navigate]);
 
+  // Fetch ratings for past rides
+  useEffect(() => {
+    const fetchRatings = async () => {
+      if (completedRides.length > 0) {
+        const ratingsMap = {};
+        for (const ride of completedRides) {
+          try {
+            const rating = await ratingService.getUserRating(ride.id);
+            if (rating) {
+              ratingsMap[ride.id] = rating;
+            }
+          } catch (error) {
+            console.error('Error fetching rating for ride:', ride.id, error);
+          }
+        }
+        setRatings(ratingsMap);
+      }
+    };
+
+    if (activeTab === 'completed') {
+      fetchRatings();
+    }
+  }, [completedRides, activeTab]);
+
   const handleViewDetails = (trip) => {
     const rideData = {
       _id: trip.id,
@@ -190,6 +222,32 @@ function MyTrips() {
       console.error('Error cancelling ride:', err);
       setError(err.message || 'Failed to cancel ride. Please try again.');
       setLoading(false);
+    }
+  };
+
+  const handleRatingClick = (ride) => {
+    setSelectedRide(ride);
+    setRatingValue(0);
+    setComment('');
+    setShowRatingModal(true);
+  };
+
+  const handleSubmitRating = async () => {
+    if (!ratingValue) {
+      toast.error('Please select a rating');
+      return;
+    }
+
+    try {
+      await ratingService.submitRating(selectedRide.id, ratingValue, comment);
+      setRatings(prev => ({
+        ...prev,
+        [selectedRide.id]: { rating: ratingValue, comment }
+      }));
+      setShowRatingModal(false);
+      toast.success('Rating submitted successfully');
+    } catch (error) {
+      toast.error(error.message || 'Failed to submit rating');
     }
   };
 
@@ -311,6 +369,37 @@ function MyTrips() {
       case 'cancelled': return 'border-red-400';
       default: return 'border-gray-300';
     }
+  };
+
+  const renderRatingStars = (ride) => {
+    const userRating = ratings[ride.id];
+    if (userRating) {
+      return (
+        <div className="flex items-center space-x-2">
+          <div className="flex">
+            {[...Array(5)].map((_, index) => (
+              <FaStar
+                key={index}
+                className={`text-yellow-400 ${index < userRating.rating ? 'text-yellow-400' : 'text-gray-300'}`}
+              />
+            ))}
+          </div>
+          {userRating.comment && (
+            <p className="text-sm text-gray-600">{userRating.comment}</p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <button
+        onClick={() => handleRatingClick(ride)}
+        className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+      >
+        <FaRegStar className="text-yellow-400 mr-2" />
+        <span>Rate this ride</span>
+      </button>
+    );
   };
 
   // Function to render a ride card
@@ -482,15 +571,13 @@ function MyTrips() {
               View Details
             </button>
             
-            {trip.status !== 'cancelled' && trip.status !== 'completed' && (
+            {trip.status === 'completed' && !ratings[trip.id] && (
               <button
-                onClick={() => handleCancelRide(trip.id)}
-                className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
+                onClick={() => handleRatingClick(trip)}
+                className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-700 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center"
               >
-                <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Cancel Trip
+                <FaRegStar className="text-yellow-400 mr-2" />
+                <span>Rate this ride</span>
               </button>
             )}
           </div>
@@ -818,6 +905,70 @@ function MyTrips() {
           )}
         </div>
       </div>
+      
+      {/* Rating Modal */}
+      {showRatingModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="flex justify-between items-center mb-4">
+              <button
+                className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <FaRegStar className="text-yellow-400" />
+                <span className="text-xl font-semibold">Rate Your Ride</span>
+              </button>
+              <button
+                onClick={() => setShowRatingModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">How was your experience?</p>
+              <div className="flex space-x-2">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    onClick={() => setRatingValue(value)}
+                    className={`text-2xl ${ratingValue >= value ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-400 transition-colors`}
+                  >
+                    {ratingValue >= value ? <FaStar /> : <FaRegStar />}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Comment (optional)
+              </label>
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                rows="3"
+                placeholder="Share your experience..."
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <button
+                onClick={() => setShowRatingModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitRating}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Submit Rating
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

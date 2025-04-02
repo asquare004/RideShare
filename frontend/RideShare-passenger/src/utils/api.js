@@ -18,14 +18,17 @@ api.interceptors.request.use(
     const state = store.getState();
     const token = state.user?.currentUser?.token;
     
-    // Check for cookie
-    const cookies = document.cookie.split(';').map(cookie => cookie.trim());
-    const hasAuthCookie = cookies.some(cookie => cookie.startsWith('access_token='));
-    
-    // If no cookie but we have a token in Redux, add it to headers
-    if (!hasAuthCookie && token) {
+    // Always add token to headers if available
+    if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
+
+    console.log('API Request config:', {
+      url: config.url,
+      method: config.method,
+      headers: config.headers,
+      data: config.data
+    });
 
     return config;
   },
@@ -37,8 +40,22 @@ api.interceptors.request.use(
 
 // Add response interceptor to handle 401 errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log('API Response:', {
+      url: response.config.url,
+      status: response.status,
+      data: response.data
+    });
+    return response;
+  },
   (error) => {
+    console.error('API Response error:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
+
     if (error.response?.status === 401) {
       // Dispatch sign out action
       store.dispatch(signOutSuccess());

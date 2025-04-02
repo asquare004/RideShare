@@ -7,9 +7,11 @@ import userRidesRouter from './routes/userRides.js';
 import authRouter from './routes/auth.js';
 import userRouter from './routes/user.js';
 import driverRouter from './routes/driver.js';
+import ratingRouter from './routes/rating.js';
 import path from 'path';
 import cors from 'cors';
 import Ride from './models/Ride.js';
+import Rating from './models/Rating.js';
 
 dotenv.config();
 
@@ -39,6 +41,49 @@ app.use('/api/user-rides', userRidesRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
 app.use('/api/driver', driverRouter);
+app.use('/api/ratings', ratingRouter);
+
+// Debug route - add this before the 404 handler
+app.get('/api/debug/routes', (req, res) => {
+  const routes = [];
+  
+  app._router.stack.forEach(middleware => {
+    if(middleware.route) {
+      // Route directly attached to the app
+      routes.push({
+        path: middleware.route.path,
+        methods: Object.keys(middleware.route.methods)
+      });
+    } else if(middleware.name === 'router') {
+      // Routes attached to other routers
+      middleware.handle.stack.forEach(handler => {
+        if(handler.route) {
+          const routePath = handler.route.path;
+          const basePath = middleware.regexp.toString()
+            .replace('\\^', '')
+            .replace('\\/?(?=\\/|$)', '')
+            .replace(/\\\//g, '/')
+            .replace(/\(\?:\(\[\^\\\/\]\+\?\)\)/g, ':id');
+          
+          routes.push({
+            path: basePath + routePath,
+            methods: Object.keys(handler.route.methods)
+          });
+        }
+      });
+    }
+  });
+  
+  res.json({ routes });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(err.status || 500).json({
+    message: err.message || 'Internal Server Error'
+  });
+});
 
 // 404 handler
 app.use((req, res) => {
@@ -46,80 +91,16 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-// MongoDB connection with improved options
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/rideshare', {
-  serverSelectionTimeoutMS: 15000, // Timeout for server selection
-  socketTimeoutMS: 45000, // Socket timeout
-  connectTimeoutMS: 30000, // Connection timeout
-  heartbeatFrequencyMS: 10000, // Regular heartbeat to keep connection alive
-  maxPoolSize: 10, // Maximum number of connections in the connection pool
-  minPoolSize: 2, // Minimum number of connections in the connection pool
-  retryWrites: true, // Retry writes if a network error happens
-})
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('Connected to MongoDB');
-    setupScheduledTasks(); // Setup cleanup tasks after DB connection
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
   })
   .catch((err) => {
-    console.error('Error connecting to MongoDB', err);
+    console.error('Error connecting to MongoDB:', err);
   });
 
-// Setup scheduled tasks for maintenance
-function setupScheduledTasks() {
-  // Schedule a task to run every hour to mark past rides as completed
-  setInterval(async () => {
-    try {
-      console.log('Running scheduled task: updating past rides statuses');
-      
-      const currentDate = new Date();
-      const dateString = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
-      const timeString = currentDate.toTimeString().split(' ')[0]; // HH:MM:SS
-      
-      // Find scheduled/pending rides that are in the past
-      const result = await Ride.updateMany(
-        {
-          status: { $in: ['scheduled', 'pending'] },
-          $or: [
-            // Past date
-            { date: { $lt: dateString } },
-            // Same date but past time
-            { date: dateString, departureTime: { $lt: timeString } }
-          ]
-        },
-        { $set: { status: 'completed' } }
-      );
-      
-      if (result.modifiedCount > 0) {
-        console.log(`Updated ${result.modifiedCount} past rides to 'completed' status`);
-      } else {
-        console.log('No past rides needed status updates');
-      }
-    } catch (error) {
-      console.error('Error in scheduled ride status update:', error);
-    }
-  }, 60 * 60 * 1000); // Run every hour
-}
-
-// Set security headers (optional but recommended for Cross-Origin-Opener-Policy warnings)
-app.use((req, res, next) => {
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-  next();
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Internal Server Error';
-  res.status(statusCode).json({
-    success: false,
-    statusCode,
-    message,
-  });
-});
-
-// Specify host and port
-app.listen(PORT, () => {
-  console.log(`Server is running on port: ${PORT}`);
-});
+export default app;

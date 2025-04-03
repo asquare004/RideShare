@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import api from '../utils/api';
 
 function MyTrips() {
   const [trips, setTrips] = useState([]);
@@ -184,94 +185,112 @@ function MyTrips() {
 
   const handleStartRide = async (tripId) => {
     try {
-      // Use the correct base URL
+      console.log('Starting ride with ID:', tripId);
+      
+      // Show loading toast
+      const loadingToast = toast.loading('Starting trip...');
+      
+      // Use direct fetch instead of API utility to bypass potential middleware issues
       const baseUrl = process.env.NODE_ENV === 'development' 
         ? 'http://localhost:5000' 
         : '';
       
-      console.log('Starting ride with ID:', tripId);
-      
-      // Update the ride status directly in the database
-      const updateResponse = await fetch(`${baseUrl}/api/rides/${tripId}`, {
-        method: 'PUT',
+      const response = await fetch(`${baseUrl}/api/rides/${tripId}/start`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          status: 'ongoing'
-        }),
         credentials: 'include'
       });
       
-      if (!updateResponse.ok) {
-        const errorText = await updateResponse.text();
-        console.error('Error response:', errorText);
-        throw new Error('Failed to start ride');
+      // Clear loading toast
+      toast.dismiss(loadingToast);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        throw new Error(errorData.message || 'Failed to start ride');
       }
       
-      toast.success('Trip started successfully');
+      const data = await response.json();
+      console.log('Start ride response:', data);
       
-      // If we're on the upcoming tab, remove this trip from the list
-      if (activeTab === 'upcoming') {
-        setTrips(prevTrips => prevTrips.filter(trip => trip._id !== tripId));
+      if (data && data.success) {
+        toast.success('Trip started successfully');
+        
+        // Update local state
+        if (activeTab === 'upcoming') {
+          setTrips(prevTrips => prevTrips.filter(trip => trip._id !== tripId));
+        }
+        
+        // Switch to current tab
+        setActiveTab('current');
+        
+        // Refresh data
+        fetchTrips();
+      } else {
+        throw new Error(data?.message || 'Failed to start trip');
       }
-      
-      // Switch to the current tab
-      setActiveTab('current');
-      
-      // Wait a moment and then reload the page to ensure we get fresh data
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
     } catch (err) {
       console.error('Error starting trip:', err);
+      
+      // Show error toast
       toast.error(err.message || 'Failed to start trip. Please try again.');
     }
   };
 
   const handleEndRide = async (tripId) => {
     try {
-      // Use the correct base URL
+      console.log('Ending ride with ID:', tripId);
+      
+      // Show loading toast
+      const loadingToast = toast.loading('Ending trip...');
+      
+      // Use direct fetch instead of API utility to bypass potential middleware issues
       const baseUrl = process.env.NODE_ENV === 'development' 
         ? 'http://localhost:5000' 
         : '';
       
-      console.log('Ending ride with ID:', tripId);
-      
-      // Update the ride status directly in the database
-      const updateResponse = await fetch(`${baseUrl}/api/rides/${tripId}`, {
-        method: 'PUT',
+      const response = await fetch(`${baseUrl}/api/rides/${tripId}/end`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          status: 'completed'
-        }),
         credentials: 'include'
       });
       
-      if (!updateResponse.ok) {
-        const errorText = await updateResponse.text();
-        console.error('Error response:', errorText);
-        throw new Error('Failed to end ride');
+      // Clear loading toast
+      toast.dismiss(loadingToast);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        throw new Error(errorData.message || 'Failed to end ride');
       }
       
-      toast.success('Trip completed successfully');
+      const data = await response.json();
+      console.log('End ride response:', data);
       
-      // If we're on the current tab, remove this trip from the list
-      if (activeTab === 'current') {
-        setTrips(prevTrips => prevTrips.filter(trip => trip._id !== tripId));
+      if (data && data.success) {
+        toast.success('Trip completed successfully');
+        
+        // Update local state
+        if (activeTab === 'current') {
+          setTrips(prevTrips => prevTrips.filter(trip => trip._id !== tripId));
+        }
+        
+        // Switch to past tab
+        setActiveTab('past');
+        
+        // Refresh data
+        fetchTrips();
+      } else {
+        throw new Error(data?.message || 'Failed to end trip');
       }
-      
-      // Switch to the past tab
-      setActiveTab('past');
-      
-      // Wait a moment and then reload the page to ensure we get fresh data
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
     } catch (err) {
       console.error('Error ending trip:', err);
+      
+      // Show error toast
       toast.error(err.message || 'Failed to end trip. Please try again.');
     }
   };

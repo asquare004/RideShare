@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 
 const RiderFound = ({ driver, ride }) => {
   const navigate = useNavigate();
+  
+  // Ensure we have valid driver data
+  const driverInfo = driver || {};
+  const rideInfo = ride || {};
+  
+  console.log('RiderFound component received:', { driver: driverInfo, ride: rideInfo });
 
   const handleViewTrip = () => {
     navigate('/my-trips');
@@ -31,12 +37,12 @@ const RiderFound = ({ driver, ride }) => {
           <div className="p-6 border-b border-gray-200">
             <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">Driver Information</h3>
             <div className="flex items-center">
-              {/* <div className="flex-shrink-0">
-                {driver.profilePicture ? (
+              <div className="flex-shrink-0">
+                {driverInfo.profilePicture ? (
                   <img 
                     className="h-16 w-16 rounded-full object-cover" 
-                    src={driver.profilePicture} 
-                    alt={`${driver.firstName} ${driver.lastName}`} 
+                    src={driverInfo.profilePicture} 
+                    alt={`${driverInfo.firstName || 'Driver'} ${driverInfo.lastName || ''}`} 
                   />
                 ) : (
                   <div className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center">
@@ -45,35 +51,35 @@ const RiderFound = ({ driver, ride }) => {
                     </svg>
                   </div>
                 )}
-              </div> */}
+              </div>
               <div className="ml-4">
                 <h4 className="text-lg font-semibold text-gray-900">
-                  {driver.firstName} {driver.lastName}
+                  {driverInfo.firstName || 'Driver'} {driverInfo.lastName || ''}
                 </h4>
                 <div className="mt-1 flex items-center">
                   <svg className="text-yellow-400 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                   </svg>
                   <span className="ml-1 text-sm text-gray-600">
-                    {driver.rating ? driver.rating.toFixed(1) : 'New'} • {driver.totalTrips || 0} trips
+                    {driverInfo.rating ? Number(driverInfo.rating).toFixed(1) : 'New'} • {driverInfo.totalTrips || 0} trips
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Vehicle Details if available */}
-            {driver.vehicleModel && (
+            {(driverInfo.vehicleModel || ride?.vehicleDetails?.model) && (
               <div className="mt-6 grid grid-cols-2 gap-6">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Vehicle</p>
                   <p className="text-sm font-medium text-gray-800">
-                    {driver.vehicleModel} {driver.vehicleYear || ''}
+                    {driverInfo.vehicleModel || ride?.vehicleDetails?.model || 'N/A'} {driverInfo.vehicleYear || ''}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">License Plate</p>
                   <p className="text-sm font-medium text-gray-800">
-                    {driver.licensePlate || 'N/A'}
+                    {driverInfo.licensePlate || ride?.vehicleDetails?.licensePlate || 'N/A'}
                   </p>
                 </div>
               </div>
@@ -95,7 +101,7 @@ const RiderFound = ({ driver, ride }) => {
                 </div>
                 <div className="ml-3">
                   <p className="text-xs text-gray-500">From</p>
-                  <p className="text-sm font-medium text-gray-800">{ride.source}</p>
+                  <p className="text-sm font-medium text-gray-800">{rideInfo.source || 'Unknown location'}</p>
                 </div>
               </div>
 
@@ -109,7 +115,7 @@ const RiderFound = ({ driver, ride }) => {
                 </div>
                 <div className="ml-3">
                   <p className="text-xs text-gray-500">To</p>
-                  <p className="text-sm font-medium text-gray-800">{ride.destination}</p>
+                  <p className="text-sm font-medium text-gray-800">{rideInfo.destination || 'Unknown destination'}</p>
                 </div>
               </div>
 
@@ -125,7 +131,7 @@ const RiderFound = ({ driver, ride }) => {
                   <div className="ml-3">
                     <p className="text-xs text-gray-500">Date & Time</p>
                     <p className="text-sm font-medium text-gray-800">
-                      {ride.date} • {ride.departureTime}
+                      {rideInfo.date || 'N/A'} • {rideInfo.departureTime || 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -141,7 +147,7 @@ const RiderFound = ({ driver, ride }) => {
                   </div>
                   <div className="ml-3">
                     <p className="text-xs text-gray-500">Price</p>
-                    <p className="text-sm font-medium text-blue-600">₹{ride.price}</p>
+                    <p className="text-sm font-medium text-blue-600">₹{rideInfo.price || '0'}</p>
                   </div>
                 </div>
               </div>

@@ -129,17 +129,43 @@ function FindingDriver() {
         
         // If a driver has accepted the ride
         if (response.data.status === 'accepted') {
+          console.log('Driver found! Driver details:', response.data.driver);
+          
+          // Ensure we have driver information
+          const driverInfo = response.data.driver || {};
+          
+          // Make sure we have required fields for display
+          const processedDriverInfo = {
+            _id: driverInfo._id || driverInfo.id || 'unknown',
+            firstName: driverInfo.firstName || 'Driver',
+            lastName: driverInfo.lastName || '',
+            phoneNumber: driverInfo.phoneNumber || 'N/A',
+            email: driverInfo.email || 'N/A',
+            profilePicture: driverInfo.profilePicture || '',
+            rating: driverInfo.rating || 0,
+            totalTrips: driverInfo.totalTrips || 0,
+            vehicleModel: driverInfo.vehicleModel || 'N/A',
+            vehicleYear: driverInfo.vehicleYear || '',
+            licensePlate: driverInfo.licensePlate || 'N/A'
+          };
+          
+          console.log('Processed driver info:', processedDriverInfo);
+          
           setDriverFound(true);
-          setDriverDetails(response.data.driver);
+          setDriverDetails(processedDriverInfo);
+          
           // Update ride details with the latest info
           const updatedRideData = {
             ...response.data.ride,
             leftSeats: typeof response.data.ride.leftSeats === 'string' 
               ? parseInt(response.data.ride.leftSeats, 10)
-              : response.data.ride.leftSeats
+              : response.data.ride.leftSeats,
+            driverInfo: processedDriverInfo // Ensure driver info is attached to ride
           };
+          
           console.log('Updated ride data after driver acceptance:', updatedRideData);
           setRideDetails(updatedRideData);
+          
           // Show the driver details modal
           setShowDriverModal(true);
         } else if (response.data.status === 'cancelled') {

@@ -101,8 +101,12 @@ rideSchema.virtual('availableSeats').get(function() {
   return this.leftSeats;
 });
 
-// Pre-save hook to calculate leftSeats and update status
+// Pre-save middleware to ensure leftSeats is never negative
 rideSchema.pre('save', function(next) {
+  if (this.leftSeats < 0) {
+    this.leftSeats = 0;
+  }
+
   // If this is a new ride, add the creator as a confirmed passenger
   if (this.isNew && this.createdBy) {
     // Check if creator is not already in passengers list
@@ -159,4 +163,6 @@ rideSchema.index({ driver: 1, date: 1 });
 rideSchema.index({ status: 1 });
 rideSchema.index({ 'passengers.user': 1 });
 
-export default mongoose.model('Ride', rideSchema);
+const Ride = mongoose.model('Ride', rideSchema);
+
+export default Ride;

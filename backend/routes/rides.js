@@ -31,7 +31,7 @@ router.get('/', getRides);
 // Get available rides for the current user (excluding rides where user is a passenger)
 router.get('/available', verifyToken, getAvailableRides);
 
-// Check ride status and driver acceptance
+// Check the status of a pending ride
 router.get('/pending-status/:rideId', getPendingRideStatus);
 
 // Cancel a pending ride
@@ -42,6 +42,15 @@ router.put('/accept/:rideId', verifyDriver, acceptRideAsDriver);
 
 // Cancel a ride (change status to cancelled)
 router.put('/cancel/:rideId', verifyToken, cancelRide);
+
+// Start a ride
+router.post('/:rideId/start', verifyDriver, startRide);
+
+// End a ride
+router.post('/:rideId/end', verifyDriver, endRide);
+
+// Book a ride with multiple seats
+router.post('/:rideId/book', verifyToken, bookRide);
 
 // Get a single ride by ID
 router.get('/:rideId', getRideById);
@@ -80,20 +89,5 @@ router.put('/:rideId', verifyToken, async (req, res, next) => {
 
 // Delete ride
 router.delete('/:rideId', verifyToken, deleteRide);
-
-// Join a ride as a passenger
-router.post('/:rideId/join', verifyToken, joinRide);
-
-// Book a ride with multiple seats
-router.post('/:rideId/book', verifyToken, bookRide);
-
-// Cancel a booking
-router.post('/:rideId/cancel', verifyToken, cancelBooking);
-
-// Start a ride
-router.post('/:rideId/start', verifyDriver, startRide);
-
-// End a ride
-router.post('/:rideId/end', verifyDriver, endRide);
 
 export default router;

@@ -1,117 +1,95 @@
 import { api } from '../utils/api';
 
-// Fallback publishable key in case the API endpoint fails
-const FALLBACK_PUBLISHABLE_KEY = 'pk_test_51O0qhfGvxEqHOaJUR4a7xAwZ5YeXkF9JV4XQsMhPRzBc5WQCx0WAwsldY16pxBXtDu69EKzAMuKrwSZbzTnZgP3T006HcXhCVs';
+// Fallback key ID in case the API endpoint fails
+const FALLBACK_KEY_ID = 'rzp_test_YgWdKrYj6cClno'; // Use actual test key as fallback
 
 export const paymentService = {
-  // Get Stripe publishable key
+  // Get Razorpay key ID
   getConfig: async () => {
     try {
       console.log('Fetching payment config...');
-      const response = await api.get('payments/config');
+      const response = await api.get('/payments/config');
       console.log('Payment config response:', response.data);
+      
+      if (!response.data.keyId) {
+        throw new Error('Invalid payment configuration: No key ID found');
+      }
+      
       return response.data;
     } catch (error) {
       console.error('Error getting payment config:', error);
-      
-      // If the config endpoint fails, use the fallback key
-      // This prevents the payment system from completely failing
-      if (error.response?.status === 404) {
-        console.warn('Payment config endpoint not found, using fallback key');
-        return { publishableKey: FALLBACK_PUBLISHABLE_KEY };
-      }
-      
-      // Return a more descriptive error for other issues
-      const errorMessage = error.response?.data?.message || error.message || 'Route not found';
-      throw new Error(`Payment configuration error: ${errorMessage}`);
+      throw new Error('Failed to load payment configuration. Please try again later.');
     }
   },
 
-  // Create a payment intent
+  // Create a payment order
   createPaymentIntent: async (rideId) => {
     if (!rideId) {
-      throw new Error('Failed to create payment: Missing ride ID');
+      throw new Error('Ride ID is required for payment');
     }
     
     try {
-      console.log('Creating payment intent for ride:', rideId);
+      console.log('Creating payment order for ride:', rideId);
 
-      // Ensure the URL path is correct
-      const url = 'payments/create-payment-intent';
-      console.log(`Making POST request to: ${url} with ride ID: ${rideId}`);
-      
-      const response = await api.post(url, { 
+      const response = await api.post('/payments/create-payment-intent', { 
         rideId 
       });
 
-      console.log('Payment intent created:', response.data);
-      return response.data;
-    } catch (error) {
-      console.error('Error creating payment intent:', error);
-      console.error('Error details:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-        config: error.config
-      });
+      console.log('Payment order created:', response.data);
       
-      // For demonstration/development, simulate a successful response if we get a 404
-      if (error.response?.status === 404) {
-        console.warn('Payment endpoint not found, returning mock data for development');
-        return {
-          clientSecret: 'mock_client_secret',
-          paymentIntentId: 'mock_payment_intent_id_' + Date.now(),
-          amount: 100
-        };
+      if (!response.data.orderId) {
+        throw new Error('Invalid payment response: Missing order ID');
       }
       
-      // Add more context to the error message
-      const errorMessage = error.response?.data?.message || error.message;
-      throw new Error(`Failed to create payment: ${errorMessage}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating payment order:', error);
+      
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required. Please log in and try again.');
+      }
+      
+      if (error.response?.status === 404) {
+        throw new Error('Payment service not available. Please try again later.');
+      }
+      
+      // Extract the most descriptive error message
+      const errorMessage = 
+        error.response?.data?.message || 
+        error.response?.data?.error || 
+        error.message || 
+        'Failed to create payment order. Please try again.';
+      
+      throw new Error(errorMessage);
     }
   },
 
-  // Mark payment as successful
-  confirmPayment: async (paymentIntentId, rideId) => {
-    if (!paymentIntentId || !rideId) {
-      throw new Error('Failed to confirm payment: Missing required information');
+  // Verify payment success
+  verifyPayment: async (paymentData, rideId) => {
+    if (!paymentData || !rideId) {
+      throw new Error('Payment verification requires payment data and ride ID');
     }
     
     try {
-      console.log('Confirming payment for ride:', rideId);
-
-      const url = 'payments/payment-success';
-      console.log(`Making POST request to: ${url}`);
+      console.log('Verifying payment for ride:', rideId, 'with data:', paymentData);
       
-      const response = await api.post(url, {
-        paymentIntentId,
+      const response = await api.post('/payments/payment-success', {
+        ...paymentData,
         rideId
       });
-
-      console.log('Payment confirmed:', response.data);
+      
+      console.log('Payment verification response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error confirming payment:', error);
-      console.error('Error details:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-        config: error.config
-      });
+      console.error('Payment verification error:', error);
       
-      // For demonstration/development, simulate a successful response if we get a 404
-      if (error.response?.status === 404) {
-        console.warn('Payment success endpoint not found, returning mock data for development');
-        return {
-          success: true,
-          message: 'Payment recorded successfully (mocked)',
-          ride: { id: rideId }
-        };
-      }
+      // Extract descriptive error message
+      const errorMessage = 
+        error.response?.data?.message || 
+        error.message || 
+        'Payment verification failed. Please contact support.';
       
-      // Add more context to the error message
-      const errorMessage = error.response?.data?.message || error.message;
-      throw new Error(`Failed to confirm payment: ${errorMessage}`);
+      throw new Error(errorMessage);
     }
   }
 }; 

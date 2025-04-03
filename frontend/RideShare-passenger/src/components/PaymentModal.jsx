@@ -1,12 +1,5 @@
 import React, { useState } from 'react';
 import PaymentForm from './PaymentForm';
-import { useStripe } from '@stripe/react-stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
-import { paymentService } from '../services/paymentService';
-
-// Create a striped promise instance
-const stripePromise = loadStripe('pk_test_51O0qhfGvxEqHOaJUR4a7xAwZ5YeXkF9JV4XQsMhPRzBc5WQCx0WAwsldY16pxBXtDu69EKzAMuKrwSZbzTnZgP3T006HcXhCVs');
 
 const PaymentModal = ({ ride, onClose, onSuccess }) => {
   // Calculate total amount to pay based on ride price and booked seats
@@ -76,15 +69,13 @@ const PaymentModal = ({ ride, onClose, onSuccess }) => {
             </div>
           </div>
         ) : (
-          <Elements stripe={stripePromise}>
-            <PaymentForm 
-              rideId={ride.id} 
-              amount={amount}
-              onSuccess={onSuccess}
-              onCancel={onClose}
-              onError={setError}
-            />
-          </Elements>
+          <PaymentForm 
+            rideId={ride.id} 
+            amount={amount}
+            onSuccess={onSuccess}
+            onCancel={onClose}
+            onError={setError}
+          />
         )}
       </div>
     </div>

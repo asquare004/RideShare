@@ -1,26 +1,36 @@
-import Stripe from 'stripe';
+import Razorpay from 'razorpay';
 import Ride from '../models/Ride.js';
 import { errorHandler } from '../utils/error.js';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 // Ensure environment variables are loaded
 dotenv.config();
 
-// Check if STRIPE_SECRET_KEY is available and provide better error handling
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-if (!STRIPE_SECRET_KEY) {
-  console.error('ERROR: Stripe secret key is missing! Please check your .env file.');
-  // We'll initialize with a placeholder to avoid immediate crash, but functions will fail
+// Get Razorpay keys
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+
+// Log the keys (without revealing full values)
+console.log(`Initializing Razorpay with Key ID: ${RAZORPAY_KEY_ID ? RAZORPAY_KEY_ID.substring(0, 10) + '...' : 'MISSING'}`);
+console.log(`Secret key exists: ${RAZORPAY_KEY_SECRET ? 'YES' : 'NO'}`);
+
+if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+  console.error('ERROR: Razorpay keys are missing! Please check your .env file.');
 }
 
-const stripe = new Stripe(STRIPE_SECRET_KEY || 'placeholder_key_for_initialization');
+// Initialize Razorpay - make sure both key variables have values
+const razorpay = new Razorpay({
+  key_id: RAZORPAY_KEY_ID,
+  key_secret: RAZORPAY_KEY_SECRET
+});
 
-// Create a payment intent for a ride
+// Create a payment order for a ride
 export const createPaymentIntent = async (req, res, next) => {
   try {
-    // Verify Stripe is properly configured before proceeding
-    if (!STRIPE_SECRET_KEY) {
-      return next(errorHandler(500, 'Stripe API key not configured. Please contact administrator.'));
+    // Verify Razorpay is properly configured before proceeding
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      return next(errorHandler(500, 'Razorpay keys not configured. Please contact administrator.'));
     }
     
     const { rideId } = req.body;
@@ -44,51 +54,78 @@ export const createPaymentIntent = async (req, res, next) => {
     
     const amount = ride.price * seatsBooked;
 
-    // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100), // Stripe requires amount in cents
-      currency: 'inr', // Changed to INR for Indian Rupees
-      metadata: {
+    // Create Razorpay order with shortened receipt (max 40 chars)
+    // Format: receipt_[shortened rideId]_[shortened userId]
+    const shortRideId = rideId.toString().substring(0, 10);
+    const shortUserId = userId.toString().substring(0, 10);
+    const receiptId = `rcpt_${shortRideId}_${shortUserId}`;
+
+    const options = {
+      amount: Math.round(amount * 100), // Razorpay expects amount in paise
+      currency: 'INR',
+      receipt: receiptId, // Shortened receipt ID
+      notes: {
         rideId: rideId,
         userId: userId.toString(),
-        seatsBooked: seatsBooked
+        seatsBooked: seatsBooked.toString()
       }
-    });
+    };
 
-    // Return client secret
-    res.status(200).json({
-      success: true,
-      clientSecret: paymentIntent.client_secret,
-      amount: amount,
-      paymentIntentId: paymentIntent.id
-    });
+    console.log('Creating Razorpay order with options:', options);
+    
+    try {
+      const order = await razorpay.orders.create(options);
+      console.log('Razorpay order created:', order);
+      
+      // Return order details
+      res.status(200).json({
+        success: true,
+        orderId: order.id,
+        amount: amount,
+        currency: 'INR',
+        keyId: RAZORPAY_KEY_ID
+      });
+    } catch (razorpayError) {
+      console.error('Razorpay order creation error:', razorpayError);
+      console.error('Error details:', razorpayError);
+      return next(errorHandler(500, `Razorpay error: ${razorpayError.error?.description || razorpayError.message || 'Payment gateway error'}`));
+    }
   } catch (error) {
-    console.error('Payment intent error:', error);
+    console.error('General payment error:', error);
     next(error);
   }
 };
 
-// Update ride status after successful payment
+// Verify and handle payment completion
 export const handlePaymentSuccess = async (req, res, next) => {
   try {
-    // Verify Stripe is properly configured before proceeding
-    if (!STRIPE_SECRET_KEY) {
-      return next(errorHandler(500, 'Stripe API key not configured. Please contact administrator.'));
+    // Verify Razorpay is properly configured
+    if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
+      return next(errorHandler(500, 'Razorpay keys not configured. Please contact administrator.'));
     }
     
-    const { paymentIntentId, rideId } = req.body;
+    const { 
+      razorpay_order_id, 
+      razorpay_payment_id, 
+      razorpay_signature,
+      rideId 
+    } = req.body;
+    
     const userId = req.user._id;
 
     // Validate input
-    if (!paymentIntentId || !rideId) {
-      return next(errorHandler(400, 'Payment intent ID and ride ID are required'));
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !rideId) {
+      return next(errorHandler(400, 'Payment verification requires order ID, payment ID, signature, and ride ID'));
     }
 
-    // Verify payment intent
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-
-    if (paymentIntent.status !== 'succeeded') {
-      return next(errorHandler(400, 'Payment has not been completed'));
+    // Verify payment signature
+    const generatedSignature = crypto
+      .createHmac('sha256', RAZORPAY_KEY_SECRET)
+      .update(razorpay_order_id + '|' + razorpay_payment_id)
+      .digest('hex');
+    
+    if (generatedSignature !== razorpay_signature) {
+      return next(errorHandler(400, 'Invalid payment signature. Payment verification failed.'));
     }
 
     // Update ride to mark payment as completed for this passenger
@@ -108,33 +145,45 @@ export const handlePaymentSuccess = async (req, res, next) => {
 
     // Update payment status
     ride.passengers[passengerIndex].paymentStatus = 'completed';
-    ride.passengers[passengerIndex].paymentId = paymentIntentId;
+    ride.passengers[passengerIndex].paymentId = razorpay_payment_id;
     
     await ride.save();
 
     res.status(200).json({
       success: true,
-      message: 'Payment recorded successfully',
+      message: 'Payment verified and recorded successfully',
       ride
     });
   } catch (error) {
-    console.error('Payment success handling error:', error);
+    console.error('Payment verification error:', error);
     next(error);
   }
 };
 
-// Get payment config (publishable key)
+// Get payment config (key ID)
 export const getPaymentConfig = async (req, res) => {
-  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
-  
-  if (!publishableKey) {
-    return res.status(500).json({
+  try {
+    const keyId = process.env.RAZORPAY_KEY_ID;
+    
+    if (!keyId) {
+      console.error('RAZORPAY_KEY_ID is not defined in environment variables');
+      return res.status(500).json({
+        success: false,
+        message: 'Razorpay key ID not configured'
+      });
+    }
+    
+    console.log('Returning payment config with Razorpay key:', keyId.substring(0, 8) + '...');
+    
+    res.status(200).json({
+      keyId,
+      success: true
+    });
+  } catch (error) {
+    console.error('Error fetching payment config:', error);
+    res.status(500).json({
       success: false,
-      message: 'Stripe publishable key not configured'
+      message: 'Failed to get payment configuration'
     });
   }
-  
-  res.status(200).json({
-    publishableKey
-  });
 }; 

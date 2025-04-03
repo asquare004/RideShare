@@ -3,6 +3,8 @@ import { errorHandler } from './error.js';
 
 // For regular user authentication
 export const verifyToken = (req, res, next) => {
+  console.log('verifyToken middleware called');
+  
   // Get token from cookie or Authorization header
   const token = req.cookies.access_token;
   const authHeader = req.headers.authorization;
@@ -10,18 +12,34 @@ export const verifyToken = (req, res, next) => {
   
   if (authHeader && authHeader.startsWith('Bearer ')) {
     headerToken = authHeader.substring(7);
+    console.log('Found token in Authorization header');
   }
   
   // Use cookie token or header token
   const finalToken = token || headerToken;
   
   if (!finalToken) {
+    console.log('No access token found in cookies or headers');
     return next(errorHandler(401, 'You are not authenticated'));
   }
   
   try {
     const decoded = jwt.verify(finalToken, process.env.JWT_SECRET);
-    req.user = { ...decoded, _id: decoded.id }; // Ensure _id is set for compatibility
+    console.log('Token verified successfully. User ID:', decoded.id);
+    
+    // Create a complete user object with all necessary fields
+    req.user = { 
+      ...decoded,
+      _id: decoded.id,    // Ensure _id is set for Mongoose compatibility
+      id: decoded.id      // Ensure id is always set
+    };
+    
+    console.log('User object set on request:', {
+      id: req.user.id,
+      _id: req.user._id,
+      role: req.user.role || 'user'
+    });
+    
     next();
   } catch (err) {
     console.error('Token verification error:', err);
@@ -62,7 +80,22 @@ export const verifyDriverToken = (req, res, next) => {
       return next(errorHandler(403, 'Access denied. Driver role required'));
     }
     
-    req.user = decoded;
+    // Ensure all required fields are set correctly for both formats
+    req.driver = decoded;
+    
+    // Create a complete user object with all necessary fields for different access patterns
+    req.user = { 
+      ...decoded,
+      _id: decoded.id,  // For compatibility with mongoose models that expect _id
+      id: decoded.id    // Ensure id is always set
+    };
+    
+    console.log('User object set on request:', {
+      id: req.user.id,
+      _id: req.user._id,
+      role: req.user.role
+    });
+    
     next();
   } catch (err) {
     console.log('Driver token verification error:', err);
@@ -116,6 +149,7 @@ export const checkDriverAuth = (req, res, next) => {
 export const verifyDriver = (req, res, next) => {
   console.log('verifyDriver middleware called');
   console.log('Request cookies:', req.cookies);
+  console.log('Authorization header:', req.headers.authorization);
   
   // Get token from driver cookie
   const token = req.cookies.driver_access_token;
@@ -142,11 +176,26 @@ export const verifyDriver = (req, res, next) => {
     console.log('Driver token verified successfully. Driver ID:', decoded.id);
     
     if (decoded.role !== 'driver') {
+      console.log('User role check failed. Role:', decoded.role);
       return next(errorHandler(403, 'Access denied. Driver role required'));
     }
     
+    // Ensure all required fields are set correctly for both formats
     req.driver = decoded;
-    req.user = decoded; // Keep this for backward compatibility
+    
+    // Create a complete user object with all necessary fields for different access patterns
+    req.user = { 
+      ...decoded,
+      _id: decoded.id,  // For compatibility with mongoose models that expect _id
+      id: decoded.id    // Ensure id is always set
+    };
+    
+    console.log('User object set on request:', {
+      id: req.user.id,
+      _id: req.user._id,
+      role: req.user.role
+    });
+    
     next();
   } catch (err) {
     console.log('Driver token verification error:', err);

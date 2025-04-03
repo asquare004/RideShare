@@ -414,19 +414,31 @@ export const getPendingRideStatus = async (req, res, next) => {
   try {
     const { rideId } = req.params;
     
+    console.log('Checking pending ride status for:', rideId);
+    
     if (!mongoose.Types.ObjectId.isValid(rideId)) {
+      console.log('Invalid ride ID format:', rideId);
       return next(errorHandler(400, 'Invalid ride ID'));
     }
     
     const ride = await Ride.findById(rideId)
       .populate('driverId', 'firstName lastName email phoneNumber vehicleModel vehicleYear licensePlate profilePicture rating totalTrips');
       
+    console.log('Found ride:', {
+      id: ride?._id,
+      status: ride?.status,
+      driverId: ride?.driverId,
+      hasDriverInfo: ride?.driverId ? 'yes' : 'no'
+    });
+    
     if (!ride) {
+      console.log('Ride not found with ID:', rideId);
       return next(errorHandler(404, 'Ride not found'));
     }
     
     // Check if the ride is still in pending status
     if (ride.status === 'pending') {
+      console.log('Ride is still pending, no driver yet');
       return res.status(200).json({ 
         status: 'pending',
         message: 'Still looking for a driver' 
@@ -435,10 +447,17 @@ export const getPendingRideStatus = async (req, res, next) => {
     
     // Check if ride has been accepted by a driver
     if (ride.status === 'scheduled' && ride.driverId) {
+      console.log('Ride has been accepted by a driver:', {
+        driverId: ride.driverId?._id || ride.driverId,
+        driverName: ride.driverId?.firstName ? `${ride.driverId.firstName} ${ride.driverId.lastName || ''}` : 'Unknown'
+      });
+      
+      const driverInfo = ride.driverId;
+      
       return res.status(200).json({
         status: 'accepted',
         message: 'A driver has accepted your ride',
-        driver: ride.driverId,
+        driver: driverInfo,
         ride: {
           _id: ride._id,
           source: ride.source,
@@ -453,12 +472,14 @@ export const getPendingRideStatus = async (req, res, next) => {
     }
     
     // Handle canceled or other status
+    console.log(`Ride has status: ${ride.status}`);
     return res.status(200).json({
       status: ride.status,
       message: `Ride is ${ride.status}`
     });
     
   } catch (error) {
+    console.error('Error in getPendingRideStatus:', error);
     next(error);
   }
 };
@@ -541,17 +562,46 @@ export const acceptRideAsDriver = async (req, res, next) => {
     ride.driver = driverId; // Set both fields for backward compatibility
     ride.status = 'scheduled';
     
+    // Save driver vehicle details with the ride for easy access
+    if (driver.vehicleModel || driver.vehicleYear || driver.licensePlate) {
+      ride.vehicleDetails = {
+        model: driver.vehicleModel || '',
+        color: driver.vehicleColor || '',
+        licensePlate: driver.licensePlate || ''
+      };
+    }
+    
     await ride.save();
     
     console.log('Updated ride after save:', {
       id: ride._id,
       status: ride.status,
-      driverId: ride.driverId
+      driverId: ride.driverId,
+      vehicle: ride.vehicleDetails || 'none'
     });
+    
+    // Create driver info object to include in response
+    const driverInfo = {
+      _id: driver._id,
+      id: driver._id, // Include both formats for compatibility
+      firstName: driver.firstName || '',
+      lastName: driver.lastName || '',
+      email: driver.email || '',
+      phoneNumber: driver.phoneNumber || '',
+      profilePicture: driver.profilePicture || '',
+      rating: driver.rating || 0,
+      totalTrips: driver.totalTrips || 0,
+      vehicleModel: driver.vehicleModel || '',
+      vehicleYear: driver.vehicleYear || '',
+      licensePlate: driver.licensePlate || ''
+    };
+    
+    console.log('Driver info for response:', driverInfo);
     
     res.status(200).json({
       status: 'accepted',
       message: 'You have successfully accepted this ride',
+      driver: driverInfo, // Include driver info at top level
       ride: {
         _id: ride._id,
         source: ride.source,
@@ -560,7 +610,8 @@ export const acceptRideAsDriver = async (req, res, next) => {
         departureTime: ride.departureTime,
         price: ride.price,
         distance: ride.distance,
-        leftSeats: ride.leftSeats
+        leftSeats: ride.leftSeats,
+        driverInfo: driverInfo // Also include in ride object
       }
     });
   } catch (error) {
@@ -814,38 +865,77 @@ export const startRide = async (req, res, next) => {
   try {
     const { rideId } = req.params;
     
+    console.log('Starting ride:', rideId, 'by driver', req.user ? req.user._id : 'unknown');
+    
+    // Validate ride ID format
     if (!mongoose.Types.ObjectId.isValid(rideId)) {
-      return next(errorHandler(400, 'Invalid ride ID format'));
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ride ID format'
+      });
     }
     
+    // Find the ride
     const ride = await Ride.findById(rideId);
-    
     if (!ride) {
-      return next(errorHandler(404, 'Ride not found'));
+      return res.status(404).json({
+        success: false,
+        message: 'Ride not found'
+      });
     }
     
-    // Check if the user is the driver
-    if (ride.driverId.toString() !== req.user._id.toString()) {
-      return next(errorHandler(403, 'Only the assigned driver can start the ride'));
+    console.log('Found ride:', {
+      id: ride._id,
+      status: ride.status,
+      driverId: ride.driverId
+    });
+    
+    // Get the authenticated driver's ID (using either _id or id format)
+    const driverId = req.user._id || req.user.id;
+    
+    // Verify driver ownership - compare as strings to ensure proper comparison
+    const rideDriverId = ride.driverId ? ride.driverId.toString() : null;
+    const requestDriverId = driverId ? driverId.toString() : null;
+    
+    console.log('Comparing driver IDs:', {
+      rideDriverId,
+      requestDriverId,
+      match: rideDriverId === requestDriverId
+    });
+    
+    if (!rideDriverId || rideDriverId !== requestDriverId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to start this ride'
+      });
     }
     
-    // Check if the ride is in a valid state to be started
+    // Check ride status
     if (ride.status !== 'scheduled') {
-      return next(errorHandler(400, `Cannot start a ride with status: ${ride.status}. Only scheduled rides can be started.`));
+      return res.status(400).json({
+        success: false,
+        message: `Cannot start a ride with status: ${ride.status}. Only scheduled rides can be started.`
+      });
     }
     
-    // Update the ride status to ongoing
+    // Update ride status
     ride.status = 'ongoing';
     await ride.save();
     
+    console.log('Ride started successfully:', ride._id);
+    
     res.status(200).json({
       success: true,
-      message: 'Ride has been started successfully',
+      message: 'Ride started successfully',
       ride
     });
-    
   } catch (error) {
-    next(error);
+    console.error('Error in startRide:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error when starting ride',
+      error: error.message
+    });
   }
 };
 
@@ -854,37 +944,76 @@ export const endRide = async (req, res, next) => {
   try {
     const { rideId } = req.params;
     
+    console.log('Ending ride:', rideId, 'by driver', req.user ? req.user._id : 'unknown');
+    
+    // Validate ride ID format
     if (!mongoose.Types.ObjectId.isValid(rideId)) {
-      return next(errorHandler(400, 'Invalid ride ID format'));
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ride ID format'
+      });
     }
     
+    // Find the ride
     const ride = await Ride.findById(rideId);
-    
     if (!ride) {
-      return next(errorHandler(404, 'Ride not found'));
+      return res.status(404).json({
+        success: false,
+        message: 'Ride not found'
+      });
     }
     
-    // Check if the user is the driver
-    if (ride.driverId.toString() !== req.user._id.toString()) {
-      return next(errorHandler(403, 'Only the assigned driver can end the ride'));
+    console.log('Found ride:', {
+      id: ride._id,
+      status: ride.status,
+      driverId: ride.driverId
+    });
+    
+    // Get the authenticated driver's ID (using either _id or id format)
+    const driverId = req.user._id || req.user.id;
+    
+    // Verify driver ownership - compare as strings to ensure proper comparison
+    const rideDriverId = ride.driverId ? ride.driverId.toString() : null;
+    const requestDriverId = driverId ? driverId.toString() : null;
+    
+    console.log('Comparing driver IDs:', {
+      rideDriverId,
+      requestDriverId,
+      match: rideDriverId === requestDriverId
+    });
+    
+    if (!rideDriverId || rideDriverId !== requestDriverId) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to end this ride'
+      });
     }
     
-    // Check if the ride is in a valid state to be ended
+    // Check ride status
     if (ride.status !== 'ongoing') {
-      return next(errorHandler(400, `Cannot end a ride with status: ${ride.status}. Only ongoing rides can be ended.`));
+      return res.status(400).json({
+        success: false,
+        message: `Cannot end a ride with status: ${ride.status}. Only ongoing rides can be ended.`
+      });
     }
     
-    // Update the ride status to completed
+    // Update ride status
     ride.status = 'completed';
     await ride.save();
     
+    console.log('Ride completed successfully:', ride._id);
+    
     res.status(200).json({
       success: true,
-      message: 'Ride has been completed successfully',
+      message: 'Ride completed successfully',
       ride
     });
-    
   } catch (error) {
-    next(error);
+    console.error('Error in endRide:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error when ending ride',
+      error: error.message
+    });
   }
 };

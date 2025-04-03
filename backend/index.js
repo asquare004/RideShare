@@ -40,7 +40,7 @@ app.use((req, res, next) => {
 app.use('/api/rides', ridesRouter);
 app.use('/api/user-rides', userRidesRouter);
 app.use('/api/auth', authRouter);
-app.use('/api/user', userRouter);
+app.use('/api/users', userRouter);
 app.use('/api/driver', driverRouter);
 app.use('/api/ratings', ratingRouter);
 app.use('/api/payments', paymentRouter);
@@ -81,9 +81,33 @@ app.get('/api/debug/routes', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(err.status || 500).json({
-    message: err.message || 'Internal Server Error'
+  console.error('Error details:', err);
+  
+  // Check if the error is specifically marked as a Razorpay error
+  // or if it contains Razorpay-specific properties
+  if (
+    (err.source === 'razorpay') || 
+    (err.error && (err.error.code === 'BAD_REQUEST_ERROR' || err.error.description?.includes('Razorpay')))
+  ) {
+    // This is definitely a Razorpay error
+    return res.status(err.statusCode || 400).json({
+      message: err.description || (err.error ? err.error.description : 'Payment gateway error'),
+      error: err.error || err,
+      source: 'payment_gateway'
+    });
+  }
+  
+  // Standard error handling
+  const statusCode = err.statusCode || err.status || 500;
+  const errorMessage = err.message || 'Internal Server Error';
+  
+  console.error(`[${new Date().toISOString()}] ${statusCode} - ${errorMessage}`);
+  console.error('Request path:', req.path);
+  console.error('Request body:', req.body);
+  
+  res.status(statusCode).json({
+    message: errorMessage,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
 });
 
@@ -98,11 +122,11 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log('Connected to MongoDB');
     
-    // Check if Stripe is configured
-    if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY) {
-      console.log('Stripe is configured with secret key and publishable key');
+    // Check if Razorpay is configured
+    if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+      console.log('Razorpay is configured with key ID and key secret');
     } else {
-      console.warn('Stripe is not properly configured. Missing keys in .env file');
+      console.warn('Razorpay is not properly configured. Missing keys in .env file');
     }
     
     app.listen(PORT, () => {

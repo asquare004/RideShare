@@ -4,69 +4,66 @@ import { signOutSuccess } from '../redux/user/userSlice';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api/',
+  baseURL: 'http://localhost:5000/api',
   withCredentials: true,
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
   },
-  // Increase timeout for debugging
-  timeout: 10000
 });
 
-// Add request interceptor to handle authentication
+// Helper function to get auth token
+const getAuthToken = () => {
+  // Try to get token from Redux store
+  const state = store.getState();
+  const token = state.user?.currentUser?.token;
+  
+  if (token) {
+    return token;
+  }
+  
+  // Check if we have a token in cookies as fallback
+  const cookies = document.cookie.split(';').map(cookie => cookie.trim());
+  const accessToken = cookies.find(cookie => cookie.startsWith('access_token='));
+  
+  if (accessToken) {
+    return accessToken.split('=')[1];
+  }
+  
+  return null;
+};
+
+// Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    // Get current state
-    const state = store.getState();
-    const token = state.user?.currentUser?.token;
+    const token = getAuthToken();
     
-    // Always add token to headers if available
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
-
-    // Enhanced logging for debugging
-    console.log('API Request:', {
-      fullUrl: `${config.baseURL}${config.url}`,
-      url: config.url,
-      method: config.method,
-      headers: config.headers,
-      data: config.data
-    });
-
+    
     return config;
   },
   (error) => {
-    console.error('API Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
-// Add response interceptor to handle 401 errors
+// Response interceptor for consistent error handling
 api.interceptors.response.use(
-  (response) => {
-    console.log('API Response:', {
-      url: response.config.url,
-      status: response.status,
-      data: response.data
-    });
-    return response;
-  },
+  (response) => response,
   (error) => {
-    console.error('API Response error:', {
-      fullUrl: error.config?.baseURL + error.config?.url,
-      url: error.config?.url,
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message
-    });
-
-    if (error.response?.status === 401) {
-      // Dispatch sign out action
-      store.dispatch(signOutSuccess());
-      // Redirect to sign in page
-      window.location.href = '/sign-in';
+    // Log detailed error information in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error('API Error:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
     }
+    
     return Promise.reject(error);
   }
 );

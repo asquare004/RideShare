@@ -179,7 +179,7 @@ function MyTrips() {
             paymentStatus: userPassenger?.paymentStatus || 'pending'
           };
         });
-
+        
         // Update states with the processed ride data
         updateTripStates(formattedRides);
         
@@ -1222,35 +1222,35 @@ function MyTrips() {
           {activeTab === 'current' && (
             <>
               {currentRides.length === 0 ? (
-                <div className="text-center py-12">
-                  <img 
-                    src="https://cdn-icons-png.flaticon.com/512/6134/6134065.png" 
-                    alt="No current trips" 
-                    className="w-20 h-20 mx-auto mb-4 opacity-50"
-                  />
+            <div className="text-center py-12">
+              <img 
+                src="https://cdn-icons-png.flaticon.com/512/6134/6134065.png" 
+                alt="No current trips" 
+                className="w-20 h-20 mx-auto mb-4 opacity-50"
+              />
                   <h3 className="text-lg font-medium text-gray-800 mb-2">No ongoing trips</h3>
-                  <p className="text-gray-500 max-w-md mx-auto mb-6">
+              <p className="text-gray-500 max-w-md mx-auto mb-6">
                     You don't have any ongoing trips at the moment. Check your upcoming trips or find a new ride!
-                  </p>
-                  <div className="flex justify-center space-x-4">
-                    <button
-                      onClick={() => navigate('/')}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Find a Ride
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('upcoming')}
-                      className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
-                    >
-                      View Upcoming
-                    </button>
-                  </div>
-                </div>
+              </p>
+              <div className="flex justify-center space-x-4">
+                <button
+                  onClick={() => navigate('/')}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Find a Ride
+                </button>
+                <button
+                  onClick={() => setActiveTab('upcoming')}
+                  className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  View Upcoming
+                </button>
+              </div>
+            </div>
               ) : (
                 <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                   {currentRides.map(trip => renderCurrentTrip(trip))}
-                </div>
+            </div>
               )}
             </>
           )}

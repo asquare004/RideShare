@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import ridesRouter from './routes/rides.js';
 import userRidesRouter from './routes/userRides.js';
@@ -13,8 +15,6 @@ import path from 'path';
 import cors from 'cors';
 import Ride from './models/Ride.js';
 import Rating from './models/Rating.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

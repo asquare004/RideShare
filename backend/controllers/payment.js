@@ -1,12 +1,28 @@
 import Stripe from 'stripe';
 import Ride from '../models/Ride.js';
 import { errorHandler } from '../utils/error.js';
+import dotenv from 'dotenv';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+// Ensure environment variables are loaded
+dotenv.config();
+
+// Check if STRIPE_SECRET_KEY is available and provide better error handling
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+if (!STRIPE_SECRET_KEY) {
+  console.error('ERROR: Stripe secret key is missing! Please check your .env file.');
+  // We'll initialize with a placeholder to avoid immediate crash, but functions will fail
+}
+
+const stripe = new Stripe(STRIPE_SECRET_KEY || 'placeholder_key_for_initialization');
 
 // Create a payment intent for a ride
 export const createPaymentIntent = async (req, res, next) => {
   try {
+    // Verify Stripe is properly configured before proceeding
+    if (!STRIPE_SECRET_KEY) {
+      return next(errorHandler(500, 'Stripe API key not configured. Please contact administrator.'));
+    }
+    
     const { rideId } = req.body;
     const userId = req.user._id;
 
@@ -31,7 +47,7 @@ export const createPaymentIntent = async (req, res, next) => {
     // Create payment intent
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(amount * 100), // Stripe requires amount in cents
-      currency: 'usd',
+      currency: 'inr', // Changed to INR for Indian Rupees
       metadata: {
         rideId: rideId,
         userId: userId.toString(),
@@ -55,6 +71,11 @@ export const createPaymentIntent = async (req, res, next) => {
 // Update ride status after successful payment
 export const handlePaymentSuccess = async (req, res, next) => {
   try {
+    // Verify Stripe is properly configured before proceeding
+    if (!STRIPE_SECRET_KEY) {
+      return next(errorHandler(500, 'Stripe API key not configured. Please contact administrator.'));
+    }
+    
     const { paymentIntentId, rideId } = req.body;
     const userId = req.user._id;
 
@@ -104,7 +125,16 @@ export const handlePaymentSuccess = async (req, res, next) => {
 
 // Get payment config (publishable key)
 export const getPaymentConfig = async (req, res) => {
+  const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+  
+  if (!publishableKey) {
+    return res.status(500).json({
+      success: false,
+      message: 'Stripe publishable key not configured'
+    });
+  }
+  
   res.status(200).json({
-    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY
+    publishableKey
   });
 }; 

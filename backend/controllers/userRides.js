@@ -7,20 +7,12 @@ export const getUserRides = async (req, res, next) => {
   try {
     const { 
       status, 
-      limit = 10, 
+      limit = 200, // Increased limit further to ensure we get all rides
       startIndex = 0 
     } = req.query;
     
     // Get current date and time
     const today = new Date();
-    
-    // Initialize filters
-    let filter = {};
-    
-    // Add status filter if provided
-    if (status) {
-      filter.status = status;
-    }
     
     // Handle user-specific filters
     if (!req.user || !req.user._id) {
@@ -32,21 +24,69 @@ export const getUserRides = async (req, res, next) => {
     
     console.log('Looking for rides for user:', userId);
     
-    // Find rides where user is a passenger
-    filter['passengers.user'] = userId;
+    // Initialize filters - first create a filter that will catch ALL possible places a user ID could be
+    let filter = {
+      $or: [
+        // User is a passenger - try multiple ways to match passenger
+        { 'passengers.user': userId },                    // Direct ObjectId match
+        { 'passengers.user': userId.toString() },         // String match
+        { 'passengers.userId': userId },                  // Alternative field name
+        { 'passengers.userId': userId.toString() },       // Alternative field as string
+        { 'passengers.email': req.user.email },           // Email match (backup)
+
+        // User is driver using different possible field names
+        { driverId: userId },                             // As driver ID
+        { driverId: userId.toString() },                  // As string
+        { driver: userId },                               // Alternative field
+        { driver: userId.toString() },                    // Alternative as string
+        
+        // User is creator
+        { creatorId: userId },                            // As creator ID
+        { creatorId: userId.toString() },                 // As string
+        { createdBy: userId },                            // Alternative field
+        { createdBy: userId.toString() },                 // Alternative as string
+        { creator: userId },                              // Another alternative
+        { creator: userId.toString() }                    // Another alternative as string
+      ]
+    };
+    
+    // Add status filter if provided
+    if (status) {
+      filter.status = status;
+    }
     
     console.log('User rides filter:', JSON.stringify(filter, null, 2));
     
-    // Get all rides that match the filters
+    // Get all rides that match the filters, with full population
     const allRides = await Ride.find(filter)
-      .populate('driverId', 'firstName lastName email phoneNumber vehicleModel vehicleYear licensePlate profilePicture rating totalTrips')
-      .populate('passengers.user', 'firstName lastName email profilePicture')
+      .populate({
+        path: 'driverId',
+        select: 'firstName lastName email phoneNumber vehicleModel vehicleYear licensePlate profilePicture rating totalTrips'
+      })
+      .populate({
+        path: 'passengers.user',
+        select: 'firstName lastName email profilePicture'
+      })
       .lean(); // Convert to plain JavaScript objects
     
     console.log('Found rides:', allRides.length);
     
+    // Double check if we got all rides by running a separate query with just email
+    const emailRides = await Ride.find({ 'passengers.email': req.user.email }).lean();
+    console.log('Additional rides found by email:', emailRides.length);
+    
+    // Combine both result sets and remove duplicates
+    let combinedRides = [...allRides];
+    emailRides.forEach(emailRide => {
+      if (!combinedRides.some(ride => ride._id.toString() === emailRide._id.toString())) {
+        combinedRides.push(emailRide);
+      }
+    });
+    
+    console.log('Total combined rides:', combinedRides.length);
+    
     // Filter and format rides
-    const rides = allRides.map(ride => {
+    const rides = combinedRides.map(ride => {
       // Add driver info
       if (ride.driverId) {
         ride.driverInfo = {
@@ -60,26 +100,53 @@ export const getUserRides = async (req, res, next) => {
         };
       }
       
-      // Find user's booking details
-      const userBooking = ride.passengers?.find(p => p.user && p.user._id.toString() === userId.toString());
+      // Find user's booking details - try multiple passenger fields
+      const userBooking = ride.passengers?.find(p => {
+        if (!p) return false;
+        
+        // Try multiple ways to match the passenger to current user
+        return (p.user && p.user._id && p.user._id.toString() === userId.toString()) ||
+               (p.user && p.user === userId.toString()) ||
+               (p.userId && p.userId.toString() === userId.toString()) ||
+               (p.email && p.email === req.user.email);
+      });
+      
+      // Determine user's role in this ride - check all possible fields
+      const isDriver = 
+        (ride.driverId && ride.driverId._id && ride.driverId._id.toString() === userId.toString()) ||
+        (ride.driverId && ride.driverId === userId.toString()) ||
+        (ride.driver && ride.driver._id && ride.driver._id.toString() === userId.toString()) ||
+        (ride.driver && ride.driver === userId.toString()) ||
+        (ride.creatorId && ride.creatorId.toString() === userId.toString()) ||
+        (ride.createdBy && ride.createdBy.toString() === userId.toString()) ||
+        (ride.creator && ride.creator._id && ride.creator._id.toString() === userId.toString()) ||
+        (ride.creator && ride.creator === userId.toString());
+
+      const isPassenger = !!userBooking;
+      
+      // Only include rides where user has a clear role
+      if (!isDriver && !isPassenger) {
+        console.log(`Ride ${ride._id} does not have a clear role for user ${userId}`);
+        // return null; // We'll include all rides for now to debug
+      }
       
       ride.userRole = {
-        isDriver: false, // Since we're only looking for passenger rides
-        isPassenger: true,
+        isDriver: isDriver,
+        isPassenger: isPassenger,
         bookedSeats: userBooking ? userBooking.seats : 0
       };
       
       return ride;
-    });
+    }).filter(Boolean); // Remove null entries if we decide to exclude some rides
     
     // Sort rides by date and time
     rides.sort((a, b) => {
-      const dateTimeA = new Date(`${a.date}T${a.departureTime}`);
-      const dateTimeB = new Date(`${b.date}T${b.departureTime}`);
+      const dateTimeA = new Date(`${a.date}T${a.departureTime || '00:00'}`);
+      const dateTimeB = new Date(`${b.date}T${b.departureTime || '00:00'}`);
       return dateTimeA - dateTimeB;
     });
     
-    // Apply pagination
+    // Apply pagination with higher limit
     const paginatedRides = rides.slice(parseInt(startIndex), parseInt(startIndex) + parseInt(limit));
     
     res.status(200).json({

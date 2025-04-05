@@ -50,8 +50,24 @@ const getAuthToken = () => {
       console.log('Using token from localStorage');
       return localStorageToken;
     }
+    
+    // Try to get token from Redux currentUser without explicit token property
+    // This helps with some deployment environments where the token structure differs
+    if (state.user?.currentUser) {
+      // Check if token might be in a different property
+      const possibleToken = state.user.currentUser.accessToken || 
+                          (state.user.currentUser._doc && state.user.currentUser._doc.token);
+      
+      if (possibleToken) {
+        console.log('Found token in alternative location in Redux store');
+        return possibleToken;
+      }
+      
+      // Store entire user object for debugging
+      console.log('Current user object structure:', JSON.stringify(state.user.currentUser));
+    }
   } catch (e) {
-    console.error('Error accessing localStorage:', e);
+    console.error('Error accessing localStorage or parsing user object:', e);
   }
   
   console.warn('No authentication token found');
@@ -66,7 +82,26 @@ api.interceptors.request.use(
     console.log('Making request to:', config.url);
     
     if (token) {
+      console.log(`Adding Authorization header for ${config.url}`);
       config.headers['Authorization'] = `Bearer ${token}`;
+    } else {
+      console.warn(`No token available for request to ${config.url}`);
+      
+      // If this is the userRides endpoint and we have no token, try additional recovery methods
+      if (config.url.includes('user-rides')) {
+        console.log('Critical endpoint detected without token, attempting recovery...');
+        
+        // Last ditch effort - check localStorage directly
+        try {
+          const localStorageToken = localStorage.getItem('userToken');
+          if (localStorageToken) {
+            console.log('Recovery successful! Using token from localStorage');
+            config.headers['Authorization'] = `Bearer ${localStorageToken}`;
+          }
+        } catch (e) {
+          console.error('Recovery failed:', e);
+        }
+      }
     }
     
     // Add timestamp to prevent caching issues
@@ -78,6 +113,7 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );

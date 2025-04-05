@@ -173,7 +173,34 @@ export const rideService = {
       
       // Add cache-busting parameter to avoid stale data after deployment
       const timestamp = new Date().getTime();
-      const response = await api.get(`/user-rides?_t=${timestamp}`);
+      
+      // Get authentication token for logging purposes
+      const token = localStorage.getItem('userToken');
+      console.log('Token available before user rides request:', !!token);
+      
+      // Make request with explicit retry mechanism
+      const maxRetries = 2;
+      let attempts = 0;
+      let response;
+      
+      while (attempts < maxRetries) {
+        try {
+          // Make the request with a higher limit to ensure we get ALL rides
+          response = await api.get(`/user-rides?_t=${timestamp}&limit=200`);
+          // If successful, break out of retry loop
+          break;
+        } catch (retryError) {
+          attempts++;
+          console.error(`Attempt ${attempts} failed: ${retryError.message}`);
+          
+          if (attempts >= maxRetries) {
+            throw retryError; // Re-throw if we've exhausted retries
+          }
+          
+          // Wait before retrying (500ms, then 1000ms)
+          await new Promise(resolve => setTimeout(resolve, attempts * 500));
+        }
+      }
       
       // Check for auth issues
       if (response.status === 401 || (response.data && response.data.message === 'Not authenticated')) {
@@ -186,39 +213,55 @@ export const rideService = {
         throw new Error('No data received from server');
       }
 
-      console.log('Rides fetched successfully:', response.data);
+      // Perform additional validation on the received rides data
+      const rides = response.data.rides || [];
+      
+      // Check if rides data is valid
+      if (rides.length > 0) {
+        console.log(`Received ${rides.length} rides from server`);
+        
+        // Log the first ride to help with debugging
+        console.log('Sample ride:', {
+          id: rides[0]._id,
+          source: rides[0].source,
+          destination: rides[0].destination,
+          status: rides[0].status,
+          // Check if user is driver, passenger, or both
+          isDriver: rides[0].userRole?.isDriver,
+          isPassenger: rides[0].userRole?.isPassenger
+        });
+        
+        // Check for rides that might be incorrectly structured
+        const problematicRides = rides.filter(ride => 
+          !ride.source || !ride.destination || !ride.date || !ride.departureTime
+        );
+        
+        if (problematicRides.length > 0) {
+          console.warn(`Found ${problematicRides.length} problematic rides with missing data`);
+        }
+      } else {
+        console.log('No rides returned from the server');
+      }
       
       return {
         success: true,
-        rides: response.data.rides || [],
-        totalRides: response.data.totalRides
+        rides: rides,
+        totalRides: response.data.totalRides || rides.length
       };
     } catch (error) {
-      console.error('Error fetching user rides:', error);
+      console.error('Error in getUserRides:', error);
       
-      // Detailed error logging for debugging
-      if (error.response) {
-        console.error('Error response details:', {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data,
-          headers: error.response.headers,
-        });
-      } else if (error.request) {
-        console.error('No response received:', error.request);
-      }
+      // Additional context for debugging
+      console.error('Request URL:', '/user-rides');
+      console.error('Current user in localStorage:', localStorage.getItem('userToken') ? 'Token exists' : 'No token');
       
-      // Handle specific error cases
-      if (error.response?.status === 401) {
-        throw new Error('Please sign in to view your rides');
-      } else if (error.response?.status === 500) {
-        console.error('Server error details:', error.response.data);
-        throw new Error('Server error while fetching rides. Please try again later.');
-      } else if (!error.response) {
-        throw new Error('Network error. Please check your connection and try again.');
-      }
-      
-      throw error;
+      // Try to recover with empty response instead of throwing
+      return {
+        success: false,
+        rides: [],
+        totalRides: 0,
+        message: error.message || 'Failed to fetch your rides'
+      };
     }
   },
   

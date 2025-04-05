@@ -60,16 +60,6 @@ function Navbar() {
                 My Trips
               </button>
             </Link>
-            <Link
-              to='/profile'
-              className='self-center whitespace-nowrap text-sm sm:text-xl font-semibold dark:text-white'
-            >
-              <button 
-                className="text-gray-600 hover:text-blue-600 text-base font-inter transition-colors duration-200"
-              >
-                Profile
-              </button>
-            </Link>
             {currentUser ? (
               <button
                 onClick={handleSignOut}

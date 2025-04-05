@@ -5,7 +5,6 @@ import Navbar from './components/Navbar';
 import DriverNavbar from './components/DriverNavbar';
 import RideSearch from './pages/RideSearch';
 import RideCreate from './pages/RideCreate';
-import Profile from './pages/Profile';
 import FindDriver from './pages/FindDriver';
 import FindingDriver from './pages/FindingDriver';
 import RideConfirmation from './pages/RideConfirmation';
@@ -28,7 +27,6 @@ function App() {
         <Routes>
           <Route path='/' element={<RideSearch />} />
           <Route path='/create-ride' element={<RideCreate />} />
-          <Route path='/profile' element={<Profile />} />
           <Route path='/search' element={<RideSearch />} />
           <Route path='/book-ride' element={<RideCreate />} />
           <Route path='/sign-in' element={<SignIn />} />

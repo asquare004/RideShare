@@ -42,6 +42,18 @@ function SignIn() {
       if (res.ok) {
         console.log('Cookies after sign in:', document.cookie);
         
+        // Extract and store token for redundancy
+        if (data.token) {
+          console.log('Token received from server (storing to localStorage)');
+          try {
+            localStorage.setItem('userToken', data.token);
+          } catch (e) {
+            console.error('Failed to store token in localStorage:', e);
+          }
+        } else {
+          console.warn('No token received from server');
+        }
+        
         dispatch(signInSuccess(data));
         
         navigate("/");

@@ -387,7 +387,7 @@ function MyTrips() {
     return (
       <div 
         key={trip._id}
-        className={`bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 ${getBorderColor(trip.status)} border-l-4`}
+        className={`bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 ${getBorderColor(trip.status)} border-l-4`}
       >
         {/* Trip Header */}
         <div className="bg-gray-50 p-3 border-b border-gray-100">
@@ -593,237 +593,250 @@ function MyTrips() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="container mx-auto px-8 pt-20 pb-8">
-        <div className="bg-white rounded-lg shadow">
+    <div className="min-h-screen bg-white">
+      <div className="container mx-auto px-4 pt-24 pb-20">
+        {/* Title Header */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
           <div className="p-4">
             <h2 className="text-xl font-bold text-gray-900">My Trips</h2>
             <p className="mt-0.5 text-sm text-gray-600">
               View and manage all your trips as a driver
             </p>
           </div>
-
+          
           {/* Tabs */}
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8 px-4">
-              <button
-                onClick={() => setActiveTab('current')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'current'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Current Trips
-              </button>
-              <button
-                onClick={() => setActiveTab('upcoming')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'upcoming'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Upcoming Trips
-              </button>
-              <button
-                onClick={() => setActiveTab('past')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'past'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                Past Trips
-              </button>
-            </nav>
+          <div className="flex border-t border-gray-100">
+            <button
+              className={`flex-1 py-4 px-6 text-center font-medium ${
+                activeTab === 'current'
+                ? 'text-blue-600 border-b-2 border-blue-500 bg-blue-50' 
+                : 'text-gray-500 hover:text-blue-500 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('current')}
+            >
+              Current Trips
+              {trips.length > 0 && activeTab === 'current' && (
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {trips.length}
+                </span>
+              )}
+            </button>
+            <button
+              className={`flex-1 py-4 px-6 text-center font-medium ${
+                activeTab === 'upcoming'
+                ? 'text-blue-600 border-b-2 border-blue-500 bg-blue-50' 
+                : 'text-gray-500 hover:text-blue-500 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('upcoming')}
+            >
+              Upcoming Trips
+              {trips.length > 0 && activeTab === 'upcoming' && (
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {trips.length}
+                </span>
+              )}
+            </button>
+            <button
+              className={`flex-1 py-4 px-6 text-center font-medium ${
+                activeTab === 'past'
+                ? 'text-blue-600 border-b-2 border-blue-500 bg-blue-50' 
+                : 'text-gray-500 hover:text-blue-500 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('past')}
+            >
+              Past Trips
+              {trips.length > 0 && activeTab === 'past' && (
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {trips.length}
+                </span>
+              )}
+            </button>
           </div>
-
-          {/* Content */}
+          
+          {/* Error Message */}
+          {error && (
+            <div className="p-4 bg-red-50 border-b border-red-200">
+              <div className="flex">
+                <svg className="h-5 w-5 text-red-400 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm text-red-800">{error}</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Trips List */}
           <div className="p-4">
             {loading ? (
-              <div className="flex justify-center items-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
-              </div>
-            ) : error ? (
-              <div className="text-center py-8">
-                <p className="text-red-600">{error}</p>
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Loading your trips...</p>
               </div>
             ) : trips.length === 0 ? (
               <div className="text-center py-12">
-                <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-gray-50 mb-4">
-                  {activeTab === 'current' ? (
-                    <svg className="h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  ) : activeTab === 'upcoming' ? (
-                    <svg className="h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  ) : (
-                    <svg className="h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                  )}
-                </div>
-                <p className="text-gray-700 text-xl font-semibold">
-                  {activeTab === 'current' 
-                    ? 'No active trips at the moment'
-                    : activeTab === 'upcoming'
-                    ? 'No upcoming trips scheduled'
-                    : 'No past trips found'}
+                <img 
+                  src="https://cdn-icons-png.flaticon.com/512/6134/6134065.png" 
+                  alt="No trips" 
+                  className="w-20 h-20 mx-auto mb-4 opacity-50"
+                />
+                <h3 className="text-lg font-medium text-gray-800 mb-2">No {activeTab} trips</h3>
+                <p className="text-gray-500 max-w-md mx-auto mb-6">
+                  {activeTab === 'current' && "You don't have any ongoing trips right now."}
+                  {activeTab === 'upcoming' && "You don't have any upcoming trips scheduled."}
+                  {activeTab === 'past' && "You haven't completed any trips yet."}
                 </p>
-                <p className="text-gray-500 text-sm mt-3 max-w-sm mx-auto">
-                  {activeTab === 'current'
-                    ? 'Your active trips will appear here when you start a ride'
-                    : activeTab === 'upcoming'
-                    ? 'Your scheduled trips will appear here when you create or accept a ride'
-                    : 'Your completed trips will appear here after you finish a ride'}
-                </p>
+                {(activeTab === 'current' || activeTab === 'upcoming') && (
+                  <button
+                    onClick={() => navigate('/available-trips')}
+                    className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Find Available Trips
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {trips.map((trip) => renderRideCard(trip))}
+              <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                {trips.map(trip => renderRideCard(trip))}
               </div>
             )}
           </div>
         </div>
-      </div>
-
-      {/* Trip Details Modal */}
-      {showDetailsModal && selectedTrip && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-semibold text-gray-900">Trip Details</h3>
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="text-gray-400 hover:text-gray-500"
-                >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {/* Trip Status */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-500">Status</span>
-                  {getStatusBadge(selectedTrip.status)}
-                </div>
-
-                {/* Route Details */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Route</h4>
-                  <div className="flex items-center space-x-2">
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-500">From</p>
-                      <p className="font-medium text-gray-900">{selectedTrip.source}</p>
-                    </div>
-                    <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                    </svg>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-500">To</p>
-                      <p className="font-medium text-gray-900">{selectedTrip.destination}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Trip Details */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Date & Time</h4>
-                    <p className="text-sm text-gray-900">
-                      {new Date(selectedTrip.date).toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </p>
-                    <p className="text-sm text-gray-500">{selectedTrip.departureTime}</p>
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Distance</h4>
-                    <p className="text-sm text-gray-900">{selectedTrip.distance} km</p>
-                  </div>
-                </div>
-
-                {/* Price Details */}
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Price Details</h4>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-500">Price per seat</span>
-                      <span className="text-sm font-medium text-gray-900">₹{selectedTrip.price}</span>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-sm text-gray-500">Total seats</span>
-                      <span className="text-sm font-medium text-gray-900">{selectedTrip.totalSeats}</span>
-                    </div>
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-sm text-gray-500">Available seats</span>
-                      <span className="text-sm font-medium text-gray-900">{selectedTrip.leftSeats}</span>
-                    </div>
-                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
-                      <span className="text-sm font-medium text-gray-900">Total earnings</span>
-                      <span className="text-sm font-medium text-green-600">
-                        ₹{selectedTrip.price * (selectedTrip.totalSeats - selectedTrip.leftSeats)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Passenger List */}
-                {selectedTrip.passengers && selectedTrip.passengers.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-900 mb-2">Passengers</h4>
-                    <div className="space-y-2">
-                      {selectedTrip.passengers.map((passenger, index) => (
-                        <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{passenger.name}</p>
-                            <p className="text-xs text-gray-500">{passenger.phone}</p>
-                          </div>
-                          {passenger.rating && (
-                            <div className="flex items-center">
-                              <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                              </svg>
-                              <span className="text-sm ml-1 text-gray-600">{passenger.rating}</span>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="mt-6 flex space-x-3">
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
-                >
-                  Close
-                </button>
-                {selectedTrip.status !== 'cancelled' && selectedTrip.status !== 'completed' && (
+        
+        {/* Trip Details Modal */}
+        {showDetailsModal && selectedTrip && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="text-xl font-semibold text-gray-900">Trip Details</h3>
                   <button
-                    onClick={() => handleCancelRide(selectedTrip._id)}
-                    className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                    onClick={() => setShowDetailsModal(false)}
+                    className="text-gray-400 hover:text-gray-500"
                   >
-                    Cancel Trip
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
-                )}
+                </div>
+
+                <div className="space-y-4">
+                  {/* Trip Status */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Status</span>
+                    {getStatusBadge(selectedTrip.status)}
+                  </div>
+
+                  {/* Route Details */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Route</h4>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-500">From</p>
+                        <p className="font-medium text-gray-900">{selectedTrip.source}</p>
+                      </div>
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-500">To</p>
+                        <p className="font-medium text-gray-900">{selectedTrip.destination}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Trip Details */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Date & Time</h4>
+                      <p className="text-sm text-gray-900">
+                        {new Date(selectedTrip.date).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </p>
+                      <p className="text-sm text-gray-500">{selectedTrip.departureTime}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Distance</h4>
+                      <p className="text-sm text-gray-900">{selectedTrip.distance} km</p>
+                    </div>
+                  </div>
+
+                  {/* Price Details */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Price Details</h4>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500">Price per seat</span>
+                        <span className="text-sm font-medium text-gray-900">₹{selectedTrip.price}</span>
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-sm text-gray-500">Total seats</span>
+                        <span className="text-sm font-medium text-gray-900">{selectedTrip.totalSeats}</span>
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="text-sm text-gray-500">Available seats</span>
+                        <span className="text-sm font-medium text-gray-900">{selectedTrip.leftSeats}</span>
+                      </div>
+                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
+                        <span className="text-sm font-medium text-gray-900">Total earnings</span>
+                        <span className="text-sm font-medium text-green-600">
+                          ₹{selectedTrip.price * (selectedTrip.totalSeats - selectedTrip.leftSeats)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Passenger List */}
+                  {selectedTrip.passengers && selectedTrip.passengers.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Passengers</h4>
+                      <div className="space-y-2">
+                        {selectedTrip.passengers.map((passenger, index) => (
+                          <div key={index} className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{passenger.name}</p>
+                              <p className="text-xs text-gray-500">{passenger.phone}</p>
+                            </div>
+                            {passenger.rating && (
+                              <div className="flex items-center">
+                                <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                </svg>
+                                <span className="text-sm ml-1 text-gray-600">{passenger.rating}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="mt-6 flex space-x-3">
+                  <button
+                    onClick={() => setShowDetailsModal(false)}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                  >
+                    Close
+                  </button>
+                  {selectedTrip.status !== 'cancelled' && selectedTrip.status !== 'completed' && (
+                    <button
+                      onClick={() => handleCancelRide(selectedTrip._id)}
+                      className="flex-1 bg-red-50 hover:bg-red-100 text-red-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                    >
+                      Cancel Trip
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

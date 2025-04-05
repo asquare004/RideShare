@@ -16,7 +16,6 @@ function Navbar() {
     { name: 'Home', path: '/' },
     { name: 'My Trips', path: '/my-trips' },
     { name: 'Find Passengers', path: '/find-passengers' },
-    { name: 'Payment History', path: '/payment-history' },
   ];
 
   const handleSignOut = () => {
@@ -66,11 +65,6 @@ function Navbar() {
             <Link to="/find-passengers">
               <button className="text-gray-600 hover:text-blue-600 text-base font-inter transition-colors duration-200">
                 Find Passengers
-              </button>
-            </Link>
-            <Link to="/payment-history">
-              <button className="text-gray-600 hover:text-blue-600 text-base font-inter transition-colors duration-200">
-                Payment History
               </button>
             </Link>
             {currentUser ? (

@@ -445,8 +445,14 @@ function MyTrips() {
     setCurrentRides(current);
     setUpcomingRides(upcoming);
     setCompletedRides(completed);
-    setCreatedRides(formattedRides.filter(r => r.isCreator && r.status !== 'cancelled'));
-    setJoinedRides(formattedRides.filter(r => r.isPassenger && !r.isCreator && r.status !== 'cancelled'));
+    
+    // For a passenger:
+    // Joined rides are rides where the user is a passenger
+    setJoinedRides(formattedRides.filter(r => r.isPassenger && r.status !== 'cancelled'));
+    
+    // No need to track created rides for passengers, but we'll keep the variable
+    // for compatibility with the UI
+    setCreatedRides([]);
   };
 
   if (loading) {
@@ -1154,18 +1160,18 @@ function MyTrips() {
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 overflow-hidden relative">
           <div className="absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 bg-green-100 rounded-full opacity-70"></div>
           <div className="relative">
-            <h3 className="text-gray-500 text-sm font-medium mb-1">Created</h3>
-            <p className="text-3xl font-bold text-gray-800">{totalCreated}</p>
-            <div className="mt-1 text-xs text-green-600">As driver</div>
+            <h3 className="text-gray-500 text-sm font-medium mb-1">Joined</h3>
+            <p className="text-3xl font-bold text-gray-800">{totalJoined}</p>
+            <div className="mt-1 text-xs text-green-600">As passenger</div>
           </div>
         </div>
         
         <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 overflow-hidden relative">
           <div className="absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 bg-purple-100 rounded-full opacity-70"></div>
           <div className="relative">
-            <h3 className="text-gray-500 text-sm font-medium mb-1">Joined</h3>
-            <p className="text-3xl font-bold text-gray-800">{totalJoined}</p>
-            <div className="mt-1 text-xs text-purple-600">As passenger</div>
+            <h3 className="text-gray-500 text-sm font-medium mb-1">Booked</h3>
+            <p className="text-3xl font-bold text-gray-800">{completedRides.length}</p>
+            <div className="mt-1 text-xs text-purple-600">Completed trips</div>
           </div>
         </div>
       </div>

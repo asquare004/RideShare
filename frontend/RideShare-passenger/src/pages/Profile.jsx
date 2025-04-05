@@ -22,7 +22,6 @@ function Profile() {
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({
     totalTrips: 0,
-    createdTrips: 0,
     joinedTrips: 0,
     completedTrips: 0
   });
@@ -94,26 +93,24 @@ function Profile() {
         
         const rides = response.rides || [];
         
-        // Calculate stats
-        const created = rides.filter(ride => 
-          ride.creatorId === currentUser._id || 
-          (ride.creator && ride.creator._id === currentUser._id)
-        ).length;
-        
+        // Calculate stats correctly for a passenger
+        // Joined trips - passenger is in the passengers array but not the creator
         const joined = rides.filter(ride => {
-          if (ride.creatorId === currentUser._id || (ride.creator && ride.creator._id === currentUser._id)) {
-            return false;
-          }
+          // Check if the user is a passenger
           return ride.passengers && ride.passengers.some(p => 
-            (p.user?._id === currentUser._id) || (p.user === currentUser._id)
+            (p.user?._id === currentUser._id) || 
+            (p.user === currentUser._id)
           );
         }).length;
         
+        // Completed trips - rides with status 'completed'
         const completed = rides.filter(ride => ride.status === 'completed').length;
         
+        // Total trips is simply all rides the user is part of
+        const total = rides.length;
+        
         setStats({
-          totalTrips: rides.length,
-          createdTrips: created,
+          totalTrips: total,
           joinedTrips: joined,
           completedTrips: completed
         });
@@ -245,17 +242,6 @@ function Profile() {
                 whileHover={{ y: -5, transition: { duration: 0.2 } }}
                 className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:shadow-md transition-all duration-300"
               >
-                <div className="flex items-center justify-center text-yellow-400 mb-2">
-                  <span className="text-3xl font-bold text-gray-800">{userProfile.rating?.toFixed(1) || '0.0'}</span>
-                  <FaStar className="w-6 h-6 ml-1" />
-                </div>
-                <p className="text-sm text-gray-500">Rating</p>
-              </motion.div>
-              
-              <motion.div
-                whileHover={{ y: -5, transition: { duration: 0.2 } }}
-                className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:shadow-md transition-all duration-300"
-              >
                 <div className="flex items-center justify-center mb-2">
                   <span className="text-3xl font-bold text-gray-800">{tripLoading ? '...' : stats.totalTrips}</span>
                   <FaCar className="w-6 h-6 ml-2 text-blue-500" />
@@ -268,10 +254,10 @@ function Profile() {
                 className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:shadow-md transition-all duration-300"
               >
                 <div className="flex items-center justify-center mb-2">
-                  <span className="text-3xl font-bold text-gray-800">{tripLoading ? '...' : stats.createdTrips}</span>
+                  <span className="text-3xl font-bold text-gray-800">{tripLoading ? '...' : stats.joinedTrips}</span>
                   <FaRoute className="w-6 h-6 ml-2 text-blue-600" />
                 </div>
-                <p className="text-sm text-gray-500">Created Trips</p>
+                <p className="text-sm text-gray-500">Joined Trips</p>
               </motion.div>
               
               <motion.div
@@ -279,10 +265,21 @@ function Profile() {
                 className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:shadow-md transition-all duration-300"
               >
                 <div className="flex items-center justify-center mb-2">
-                  <span className="text-3xl font-bold text-gray-800">{tripLoading ? '...' : stats.joinedTrips}</span>
+                  <span className="text-3xl font-bold text-gray-800">{tripLoading ? '...' : stats.completedTrips}</span>
                   <FaHistory className="w-6 h-6 ml-2 text-blue-700" />
                 </div>
-                <p className="text-sm text-gray-500">Joined Trips</p>
+                <p className="text-sm text-gray-500">Completed Trips</p>
+              </motion.div>
+              
+              <motion.div
+                whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                className="bg-white rounded-lg border border-gray-100 p-4 text-center hover:shadow-md transition-all duration-300"
+              >
+                <div className="flex items-center justify-center mb-2">
+                  <span className="text-3xl font-bold text-gray-800">{tripLoading ? '...' : (stats.totalTrips - stats.completedTrips)}</span>
+                  <FaCalendarAlt className="w-6 h-6 ml-2 text-green-600" />
+                </div>
+                <p className="text-sm text-gray-500">Upcoming Trips</p>
               </motion.div>
             </div>
 

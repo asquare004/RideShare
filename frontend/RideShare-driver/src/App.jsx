@@ -6,7 +6,6 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import UpcomingTrips from './pages/UpcomingTrips';
 import PastTrips from './pages/PastTrips';
-import PaymentHistory from './pages/PaymentHistory';
 import Profile from './pages/Profile';
 import SignIn from './pages/SignIn';
 import SignUp from './pages/SignUp';
@@ -23,7 +22,6 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/my-trips" element={<MyTrips />} />
           <Route path="/find-passengers" element={<FindPassengers />} />
-          <Route path="/payment-history" element={<PaymentHistory />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/sign-in" element={<SignIn />} />
           <Route path="/sign-up" element={<SignUp />} />

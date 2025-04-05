@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { rideService } from '../services/rideService';
 import { ratingService } from '../services/ratingService';
@@ -9,6 +9,7 @@ import PaymentModal from '../components/PaymentModal';
 
 function MyTrips() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentUser } = useSelector(state => state.user);
   const [upcomingRides, setUpcomingRides] = useState([]);
   const [completedRides, setCompletedRides] = useState([]);
@@ -26,6 +27,8 @@ function MyTrips() {
   const [comment, setComment] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [rideToPayFor, setRideToPayFor] = useState(null);
+  // Add a ref to store the interval ID
+  const refreshIntervalRef = useRef(null);
 
   // Add the fetchRatings function
   const fetchRatings = async () => {
@@ -194,8 +197,31 @@ function MyTrips() {
       }
     };
 
+    // Initial fetch
     fetchUserTrips();
-  }, [currentUser, navigate]);
+    
+    // Check for tab in URL query params
+    const queryParams = new URLSearchParams(location.search);
+    const tabParam = queryParams.get('tab');
+    
+    // Set active tab from URL if valid
+    if (tabParam && ['current', 'upcoming', 'completed'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+    
+    // Set up auto-refresh interval (every 30 seconds)
+    refreshIntervalRef.current = setInterval(() => {
+      console.log('Auto-refreshing trip data...');
+      fetchUserTrips();
+    }, 30000); // 30 seconds
+    
+    // Clean up the interval on component unmount
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [currentUser, navigate, location]);
 
   const handleViewDetails = (trip) => {
     const rideData = {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../utils/api';
 
@@ -13,12 +13,22 @@ function MyTrips() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const { currentUser } = useSelector(state => state.user);
   const navigate = useNavigate();
+  const location = useLocation();
   const activeTabRef = useRef(null);
 
   useEffect(() => {
     if (!currentUser) {
       setLoading(false);
       return;
+    }
+    
+    // Check for tab in URL query params
+    const queryParams = new URLSearchParams(location.search);
+    const tabParam = queryParams.get('tab');
+    
+    // Set active tab from URL if valid
+    if (tabParam && ['current', 'upcoming', 'past'].includes(tabParam)) {
+      setActiveTab(tabParam);
     }
     
     // Debug function to check driver authentication
@@ -53,7 +63,7 @@ function MyTrips() {
     
     // Fetch trips based on the current tab
     fetchTrips();
-  }, [currentUser, activeTab]);
+  }, [currentUser, activeTab, location]);
 
   const fetchTrips = async () => {
     setLoading(true);

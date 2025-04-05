@@ -73,7 +73,9 @@ function FindPassengers() {
         toast.success('Ride accepted successfully!');
         // Remove the accepted ride from the list
         setPendingRides(prev => prev.filter(ride => ride._id !== rideId));
-        // Navigate to accepted rides view or stay on this page
+        
+        // Navigate to MyTrips page to show the accepted ride in upcoming trips
+        navigate('/my-trips?tab=upcoming');
       }
     } catch (err) {
       console.error('Error accepting ride:', err);

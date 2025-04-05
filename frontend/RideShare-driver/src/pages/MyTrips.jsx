@@ -24,9 +24,7 @@ function MyTrips() {
     // Debug function to check driver authentication
     const checkDriverAuth = async () => {
       try {
-        const baseUrl = process.env.NODE_ENV === 'development' 
-          ? 'http://localhost:5000' 
-          : '';
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
         
         // Check driver authentication cookies
         console.log('Current cookies:', document.cookie);
@@ -72,10 +70,8 @@ function MyTrips() {
   const fetchTrips = async () => {
     setLoading(true);
     try {
-      // Use the correct base URL if in development environment
-      const baseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:5000' 
-        : '';
+      // Use environment variable for API base URL
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       
       // Determine the endpoint based on activeTab
       let endpoint;
@@ -146,10 +142,8 @@ function MyTrips() {
         return;
       }
 
-      // Use the correct base URL if in development environment
-      const baseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:5000' 
-        : '';
+      // Use environment variable for API base URL
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
       // Proceed with cancellation
       const response = await fetch(`${baseUrl}/api/driver/trips/cancel/${tripId}`, {
@@ -190,10 +184,8 @@ function MyTrips() {
       // Show loading toast
       const loadingToast = toast.loading('Starting trip...');
       
-      // Use direct fetch instead of API utility to bypass potential middleware issues
-      const baseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:5000' 
-        : '';
+      // Use environment variable for API base URL
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       
       const response = await fetch(`${baseUrl}/api/rides/${tripId}/start`, {
         method: 'POST',
@@ -246,10 +238,8 @@ function MyTrips() {
       // Show loading toast
       const loadingToast = toast.loading('Ending trip...');
       
-      // Use direct fetch instead of API utility to bypass potential middleware issues
-      const baseUrl = process.env.NODE_ENV === 'development' 
-        ? 'http://localhost:5000' 
-        : '';
+      // Use environment variable for API base URL
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       
       const response = await fetch(`${baseUrl}/api/rides/${tripId}/end`, {
         method: 'POST',

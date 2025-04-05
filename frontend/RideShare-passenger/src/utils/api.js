@@ -2,9 +2,12 @@ import axios from 'axios';
 import { store } from '../redux/store';
 import { signOutSuccess } from '../redux/user/userSlice';
 
+// Get the base URL from environment variables or use the development URL as fallback
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: `${baseURL}/api`,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

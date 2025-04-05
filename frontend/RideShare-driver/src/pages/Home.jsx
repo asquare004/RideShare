@@ -29,7 +29,7 @@ function Home() {
   const fetchDriverStats = async () => {
     try {
       setLoading(true);
-      const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:5000' : '';
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       
       // Get trips by status (ongoing, scheduled, completed) instead of all trips at once
       const [ongoingResponse, scheduledResponse, completedResponse] = await Promise.all([
@@ -333,17 +333,17 @@ function Home() {
                 </div>
               </div>
             </motion.div>
-          </div>
+            </div>
 
           {/* Trip Status Section */}
           <div className="mt-8">
             <h3 className="text-lg font-semibold mb-4">Trip Status</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Ongoing Trips */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
                 className="bg-white border border-blue-200 rounded-lg p-4 hover:shadow-md transition-all duration-300"
               >
                 <div className="flex items-center mb-2">
@@ -362,13 +362,13 @@ function Home() {
                     {stats.ongoingTrips === 1 ? 'Trip in progress' : 'Trips in progress'}
                   </p>
                 </div>
-              </motion.div>
+          </motion.div>
 
               {/* Scheduled Trips */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
                 className="bg-white border border-indigo-200 rounded-lg p-4 hover:shadow-md transition-all duration-300"
               >
                 <div className="flex items-center mb-2">
@@ -387,13 +387,13 @@ function Home() {
                     {stats.scheduledTrips === 1 ? 'Trip planned' : 'Trips planned'}
                   </p>
                 </div>
-              </motion.div>
+          </motion.div>
 
               {/* Completed Trips */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
                 className="bg-white border border-green-200 rounded-lg p-4 hover:shadow-md transition-all duration-300"
               >
                 <div className="flex items-center mb-2">
@@ -412,8 +412,8 @@ function Home() {
                     {stats.completedTrips === 1 ? 'Trip completed' : 'Trips completed'}
                   </p>
                 </div>
-              </motion.div>
-            </div>
+          </motion.div>
+        </div>
           </div>
 
           {/* Recent Activity Section */}

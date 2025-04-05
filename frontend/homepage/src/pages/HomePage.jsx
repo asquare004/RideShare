@@ -7,11 +7,11 @@ import Footer from '../components/Footer';
 
 const HomePage = () => {
   const handlePassengerPortal = () => {
-    window.location.href = 'http://localhost:5175';
+    window.location.href = import.meta.env.VITE_PASSENGER_URL || 'http://localhost:5175';
   };
 
   const handleDriverPortal = () => {
-    window.location.href = 'http://localhost:5174';
+    window.location.href = import.meta.env.VITE_DRIVER_URL || 'http://localhost:5174';
   };
 
   return (

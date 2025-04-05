@@ -26,7 +26,8 @@ function SignIn() {
     }
     try {
       dispatch(signInStart());
-      const res = await fetch("http://localhost:5000/api/auth/signin", {
+      const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await fetch(`${baseURL}/api/auth/signin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',

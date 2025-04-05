@@ -18,7 +18,8 @@ export default function OAuth() {
       const resultsFromGoogle = await signInWithPopup(auth, provider);
 
       // Send user data to the backend
-      const res = await fetch("http://localhost:5000/api/auth/google", {
+      const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const res = await fetch(`${baseURL}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',

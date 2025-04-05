@@ -1,43 +1,42 @@
 import axios from 'axios';
 import Cookies from 'js-cookie';
 
-const API_URL = 'http://localhost:5000/api';
+// Get the base URL from environment variables or use the local development URL
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_URL = `${baseURL}/api`;
 
 export const authService = {
   // Register a new user
   register: async (userData) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/register`, userData, {
-        withCredentials: true // Important for cookies
-      });
-      
+      const response = await axios.post(`${API_URL}/auth/signup`, userData);
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw error.response?.data?.message || error.message || 'Registration failed';
     }
   },
 
   // Login user
-  login: async (credentials) => {
+  login: async (userData) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, credentials, {
+      const response = await axios.post(`${API_URL}/auth/signin`, userData, {
         withCredentials: true
       });
-      
       return response.data;
     } catch (error) {
-      throw error.response?.data || error.message;
+      throw error.response?.data?.message || error.message || 'Login failed';
     }
   },
 
   // Logout user
   logout: async () => {
     try {
-      await axios.post(`${API_URL}/auth/logout`, {}, {
+      const response = await axios.post(`${API_URL}/auth/signout`, {}, {
         withCredentials: true
       });
+      return response.data;
     } catch (error) {
-      console.error('Logout error:', error);
+      throw error.response?.data?.message || error.message || 'Logout failed';
     }
   },
 
@@ -50,6 +49,18 @@ export const authService = {
       return response.data.isAuthenticated;
     } catch (error) {
       return false;
+    }
+  },
+
+  // Google authentication
+  googleAuth: async (credentials) => {
+    try {
+      const response = await axios.post(`${API_URL}/auth/google`, credentials, {
+        withCredentials: true
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data?.message || error.message || 'Google authentication failed';
     }
   }
 };

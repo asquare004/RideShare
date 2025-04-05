@@ -30,7 +30,7 @@ app.use(cors({
     // Netlify deployment URLs - replace these with your actual URLs
     'https://ridesharepassenger.netlify.app',
     'https://ridesharedriver.netlify.app',
-    'https://ridesharehomepage.netlify.app/',
+    'https://ridesharehomepage.netlify.app',
     
     // If you're using custom domains, add them here
     // 'https://passenger.yourdomain.com',

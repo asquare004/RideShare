@@ -64,6 +64,13 @@ function MyTrips() {
         setLoading(true);
         setError(null); // Clear any previous errors
         
+        console.log('Starting to fetch user trips... Current environment:', import.meta.env.MODE);
+        console.log('API base URL:', import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000');
+        
+        // Add debugging for authentication
+        const token = getAuthToken();
+        console.log('Authorization token available:', !!token);
+        
         // Get all rides for the user (both created and joined)
         const response = await rideService.getUserRides();
         console.log('Received response:', response);
@@ -195,6 +202,26 @@ function MyTrips() {
         setError(error.message || 'Error loading trips. Please try again.');
         setLoading(false);
       }
+    };
+
+    // Helper function to get auth token from cookie or Redux
+    const getAuthToken = () => {
+      // Try to get token from Redux store
+      const token = currentUser?.token;
+      
+      if (token) {
+        return token;
+      }
+      
+      // Check cookies as fallback
+      const cookies = document.cookie.split(';').map(cookie => cookie.trim());
+      const accessToken = cookies.find(cookie => cookie.startsWith('access_token='));
+      
+      if (accessToken) {
+        return accessToken.split('=')[1];
+      }
+      
+      return null;
     };
 
     // Initial fetch

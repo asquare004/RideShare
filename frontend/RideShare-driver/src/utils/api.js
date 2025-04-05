@@ -4,6 +4,10 @@ import { store } from '../redux/store';
 // Get the base URL from environment variables or use the development URL as fallback
 const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
+// Log environment information for debugging
+console.log('API initialization - Environment:', import.meta.env.MODE);
+console.log('API initialization - Base URL:', baseURL);
+
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: `${baseURL}/api`,
@@ -67,6 +71,16 @@ api.interceptors.request.use(
       config.headers['Authorization'] = `Bearer ${token}`;
     } else {
       console.warn('No driver authentication token available');
+      // This might be the issue after deployment - try to get the token from localStorage as a fallback
+      try {
+        const localStorageToken = localStorage.getItem('driverToken');
+        if (localStorageToken) {
+          console.log('Found fallback token in localStorage');
+          config.headers['Authorization'] = `Bearer ${localStorageToken}`;
+        }
+      } catch (e) {
+        console.error('Error accessing localStorage:', e);
+      }
     }
     
     return config;
@@ -78,7 +92,14 @@ api.interceptors.request.use(
 
 // Response interceptor for consistent error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Log successful responses for debugging
+    console.log(`Response from ${response.config.url}:`, {
+      status: response.status,
+      data: response.data ? 'Data received' : 'No data',
+    });
+    return response;
+  },
   (error) => {
     // Log detailed error information
     console.error('API Error:', {
@@ -89,6 +110,12 @@ api.interceptors.response.use(
       data: error.response?.data,
       message: error.message
     });
+    
+    // Add deployment-specific debugging
+    if (error.response?.status === 401) {
+      console.error('Authentication error detected. Current cookies:', document.cookie);
+      console.error('Redux state:', store.getState().user);
+    }
     
     return Promise.reject(error);
   }

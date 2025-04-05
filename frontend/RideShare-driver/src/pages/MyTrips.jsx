@@ -63,6 +63,17 @@ function MyTrips() {
     
     // Fetch trips based on the current tab
     fetchTrips();
+    
+    // Set up auto-refresh interval
+    const refreshInterval = setInterval(() => {
+      console.log('Auto-refreshing trip data...');
+      fetchTrips();
+    }, 30000); // Refresh every 30 seconds
+    
+    // Clean up interval on unmount or when dependencies change
+    return () => {
+      clearInterval(refreshInterval);
+    };
   }, [currentUser, activeTab, location]);
 
   const fetchTrips = async () => {
@@ -73,6 +84,8 @@ function MyTrips() {
       const driverCookie = cookies.find(cookie => cookie.startsWith('driver_access_token='));
       const token = driverCookie ? driverCookie.split('=')[1] : currentUser?.token;
       console.log('Auth token available:', !!token, token ? `(${token.substring(0, 10)}...)` : '(none)');
+      console.log('Current environment:', import.meta.env.MODE);
+      console.log('API base URL:', import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000');
       
       // Determine the endpoint based on activeTab
       let endpoint;
@@ -90,16 +103,53 @@ function MyTrips() {
           endpoint = '/driver/trips/status/scheduled';
       }
       
-      console.log(`Fetching trips from: ${endpoint}`);
+      // Add cache-busting parameter to prevent stale data after deployment
+      const timestamp = new Date().getTime();
+      const fullEndpoint = `${endpoint}?_t=${timestamp}`;
+      console.log(`Fetching trips from: ${fullEndpoint}`);
       
-      const response = await api.get(endpoint);
+      // Ensure appropriate headers are set
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await api.get(fullEndpoint, { headers });
+      
+      // Check if we got a valid response
+      if (!response.data) {
+        throw new Error('No data received from server');
+      }
       
       const data = response.data;
       console.log(`Received ${data.length} trips:`, data);
+      
+      // Update the state with the fetched trips
       setTrips(data);
     } catch (err) {
+      // Enhanced error logging
       console.error(`Error in fetchTrips for ${activeTab} tab:`, err);
-      setError(`Failed to load ${activeTab} trips. Please try again later.`);
+      if (err.response) {
+        console.error('Error response details:', {
+          status: err.response.status,
+          statusText: err.response.statusText,
+          data: err.response.data,
+          headers: err.response.headers,
+        });
+      } else if (err.request) {
+        console.error('No response received:', err.request);
+      }
+      
+      // Set user-friendly error message
+      if (err.response?.status === 401) {
+        setError(`Authentication error. Please sign in again to view your ${activeTab} trips.`);
+      } else if (err.response?.status === 500) {
+        setError(`Server error while loading ${activeTab} trips. Please try again later.`);
+      } else if (!err.response) {
+        setError(`Network error. Please check your connection and try again.`);
+      } else {
+        setError(`Failed to load ${activeTab} trips. ${err.message || 'Please try again later.'}`);
+      }
     } finally {
       setLoading(false);
     }

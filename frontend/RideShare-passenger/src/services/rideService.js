@@ -155,9 +155,18 @@ export const rideService = {
     try {
       console.log('Fetching user rides...');
       
-      const response = await api.get('/user-rides');
+      // Add cache-busting parameter to avoid stale data after deployment
+      const timestamp = new Date().getTime();
+      const response = await api.get(`/user-rides?_t=${timestamp}`);
+      
+      // Check for auth issues
+      if (response.status === 401 || (response.data && response.data.message === 'Not authenticated')) {
+        console.error('Authentication error in getUserRides');
+        throw new Error('Please sign in again to view your rides');
+      }
       
       if (!response.data) {
+        console.error('No data received from server in getUserRides');
         throw new Error('No data received from server');
       }
 
@@ -170,12 +179,29 @@ export const rideService = {
       };
     } catch (error) {
       console.error('Error fetching user rides:', error);
+      
+      // Detailed error logging for debugging
+      if (error.response) {
+        console.error('Error response details:', {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          headers: error.response.headers,
+        });
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+      }
+      
+      // Handle specific error cases
       if (error.response?.status === 401) {
         throw new Error('Please sign in to view your rides');
       } else if (error.response?.status === 500) {
         console.error('Server error details:', error.response.data);
         throw new Error('Server error while fetching rides. Please try again later.');
+      } else if (!error.response) {
+        throw new Error('Network error. Please check your connection and try again.');
       }
+      
       throw error;
     }
   },

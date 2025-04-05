@@ -22,12 +22,20 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors({
   origin: [
+    // Local development URLs
     'http://localhost:5174',
     'http://localhost:5173', 
     'http://localhost:5175',
-    'https://rideshare-passenger.netlify.app',
-    'https://rideshare-driver.netlify.app',
-    'https://rideshare-home.netlify.app'
+    
+    // Netlify deployment URLs - replace these with your actual URLs
+    'https://ridesharepassenger.netlify.app',
+    'https://ridesharedriver.netlify.app',
+    'https://ridesharehomepage.netlify.app/',
+    
+    // If you're using custom domains, add them here
+    // 'https://passenger.yourdomain.com',
+    // 'https://driver.yourdomain.com',
+    // 'https://rideshare.yourdomain.com'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

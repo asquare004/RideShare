@@ -5,7 +5,7 @@ const Features = () => {
     {
       icon: '🛡️',
       title: 'Safe & Secure',
-      description: 'Verified drivers and real-time tracking ensure your safety throughout the journey'
+      description: 'Verified drivers and ride tracking ensure your safety throughout the journey'
     },
     {
       icon: '💰',
@@ -15,12 +15,12 @@ const Features = () => {
     {
       icon: '⭐',
       title: 'Premium Service',
-      description: 'Professional drivers and well-maintained vehicles for your comfort'
+      description: 'We connect drivers and passengers efficiently while offering flexibility, affordability, and reliability'
     },
     {
       icon: '⏱️',
       title: '24/7 Support',
-      description: 'Round-the-clock customer support for any assistance you need'
+      description: 'We offer round-the-clock ride booking and ride sharing service'
     }
   ];
 

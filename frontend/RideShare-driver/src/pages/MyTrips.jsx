@@ -151,16 +151,9 @@ function MyTrips() {
       // Clear loading toast
       toast.dismiss(loadingToast);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error response:', errorData);
-        throw new Error(errorData.message || 'Failed to start ride');
-      }
+      console.log('Start ride response:', response.data);
       
-      const data = await response.json();
-      console.log('Start ride response:', data);
-      
-      if (data && data.success) {
+      if (response.data && response.data.success) {
         toast.success('Trip started successfully');
         
         // Update local state
@@ -174,13 +167,13 @@ function MyTrips() {
         // Refresh data
         fetchTrips();
       } else {
-        throw new Error(data?.message || 'Failed to start trip');
+        throw new Error(response.data?.message || 'Failed to start trip');
       }
     } catch (err) {
       console.error('Error starting trip:', err);
       
       // Show error toast
-      toast.error(err.message || 'Failed to start trip. Please try again.');
+      toast.error(err.response?.data?.message || err.message || 'Failed to start trip. Please try again.');
     }
   };
 
@@ -191,30 +184,14 @@ function MyTrips() {
       // Show loading toast
       const loadingToast = toast.loading('Ending trip...');
       
-      // Use environment variable for API base URL
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-      
-      const response = await fetch(`${baseUrl}/api/rides/${tripId}/end`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      });
+      const response = await api.post(`/rides/${tripId}/end`);
       
       // Clear loading toast
       toast.dismiss(loadingToast);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error response:', errorData);
-        throw new Error(errorData.message || 'Failed to end ride');
-      }
+      console.log('End ride response:', response.data);
       
-      const data = await response.json();
-      console.log('End ride response:', data);
-      
-      if (data && data.success) {
+      if (response.data && response.data.success) {
         toast.success('Trip completed successfully');
         
         // Update local state
@@ -228,13 +205,13 @@ function MyTrips() {
         // Refresh data
         fetchTrips();
       } else {
-        throw new Error(data?.message || 'Failed to end trip');
+        throw new Error(response.data?.message || 'Failed to end trip');
       }
     } catch (err) {
       console.error('Error ending trip:', err);
       
       // Show error toast
-      toast.error(err.message || 'Failed to end trip. Please try again.');
+      toast.error(err.response?.data?.message || err.message || 'Failed to end trip. Please try again.');
     }
   };
 

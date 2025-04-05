@@ -40,9 +40,25 @@ export const rideService = {
   
   async checkPendingRideStatus(rideId) {
     try {
-      const response = await api.get(`/rides/pending-status/${rideId}`);
+      console.log(`Checking status for pending ride: ${rideId}`);
+      
+      // Add timestamp to prevent caching issues 
+      const timestamp = new Date().getTime();
+      const response = await api.get(`/rides/pending-status/${rideId}?_t=${timestamp}`);
+      
+      // Debug the response
+      console.log(`Status response for ride ${rideId}:`, response.data);
+      
       return response.data;
     } catch (error) {
+      console.error(`Error checking ride status for ${rideId}:`, error);
+      
+      // Check for specific error response
+      if (error.response?.status === 404) {
+        return { status: 'notfound', message: 'Ride not found' };
+      }
+      
+      // Let the caller handle other errors
       throw new Error(error.response?.data?.message || 'Failed to check ride status');
     }
   },
@@ -203,6 +219,46 @@ export const rideService = {
       }
       
       throw error;
+    }
+  },
+  
+  // Explicitly refresh and fetch a single ride by ID
+  refreshRideStatus: async (rideId) => {
+    try {
+      console.log(`Explicitly refreshing ride status for: ${rideId}`);
+      
+      // Add timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      const response = await api.get(`/rides/${rideId}?_t=${timestamp}`);
+      
+      if (!response.data) {
+        throw new Error('No ride data received');
+      }
+      
+      console.log(`Refreshed ride data:`, response.data);
+      
+      // If the ride is pending, also check if it's been accepted
+      if (response.data.status === 'pending') {
+        try {
+          const statusResponse = await api.get(`/rides/pending-status/${rideId}?_t=${timestamp}`);
+          console.log(`Additional status check for pending ride:`, statusResponse.data);
+          
+          // If the ride has been accepted, update the status
+          if (statusResponse.data.status === 'accepted') {
+            response.data.status = 'scheduled';
+            response.data.driverId = statusResponse.data.driver;
+            console.log(`Ride has been accepted, updated status to scheduled`);
+          }
+        } catch (statusErr) {
+          console.error(`Error checking pending status:`, statusErr);
+          // Continue with the main ride data
+        }
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error(`Error refreshing ride ${rideId}:`, error);
+      throw new Error(error.response?.data?.message || 'Failed to refresh ride status');
     }
   },
   

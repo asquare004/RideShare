@@ -29,6 +29,8 @@ function MyTrips() {
   const [rideToPayFor, setRideToPayFor] = useState(null);
   // Add a ref to store the interval ID
   const refreshIntervalRef = useRef(null);
+  // Add refreshing state
+  const [refreshing, setRefreshing] = useState(false);
 
   // Add the fetchRatings function
   const fetchRatings = async () => {
@@ -51,179 +53,243 @@ function MyTrips() {
       // Don't show error toast as this is not critical
     }
   };
+  
+  // Helper function to get auth token
+  const getAuthToken = () => {
+    // Try to get token from Redux store
+    const token = currentUser?.token;
+    
+    if (token) {
+      return token;
+    }
+    
+    // Check cookies as fallback
+    const cookies = document.cookie.split(';').map(cookie => cookie.trim());
+    const accessToken = cookies.find(cookie => cookie.startsWith('access_token='));
+    
+    if (accessToken) {
+      return accessToken.split('=')[1];
+    }
+    
+    return null;
+  };
+  
+  // Manual refresh handler
+  const handleManualRefresh = async () => {
+    if (refreshing) return; // Prevent multiple refreshes
+    
+    setRefreshing(true);
+    try {
+      // Show toast for better user feedback
+      toast.info('Refreshing trip data...', { autoClose: 2000 });
+      
+      // Fetch the latest trip data
+      await fetchUserTrips(true); // Pass true to indicate manual refresh
+      
+      // Show success message
+      toast.success('Trip data refreshed successfully!', { autoClose: 2000 });
+    } catch (error) {
+      toast.error('Failed to refresh trips. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+  
+  // Fetch user trips function
+  const fetchUserTrips = async (isManualRefresh = false) => {
+    if (!currentUser || !currentUser._id) {
+      setShowLoginModal(true);
+      setLoading(false);
+      return;
+    }
 
-  useEffect(() => {
-    const fetchUserTrips = async () => {
-      if (!currentUser || !currentUser._id) {
-        setShowLoginModal(true);
-        setLoading(false);
-        return;
-      }
-
-      try {
+    try {
+      if (!isManualRefresh) {
         setLoading(true);
-        setError(null); // Clear any previous errors
+      }
+      setError(null); // Clear any previous errors
+      
+      console.log('Starting to fetch user trips... Current environment:', import.meta.env.MODE);
+      console.log('API base URL:', import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000');
+      
+      // Add debugging for authentication
+      const token = getAuthToken();
+      console.log('Authorization token available:', !!token);
+      
+      // Get all rides for the user (both created and joined)
+      const response = await rideService.getUserRides();
+      console.log('Received response:', response);
+      
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to fetch rides');
+      }
+      
+      const rides = response.rides || [];
+      console.log('Processing rides:', rides.length, 'Current user:', currentUser);
+
+      // For pending rides, check if they've been accepted by a driver
+      const pendingRides = rides.filter(ride => ride.status === 'pending');
+      if (pendingRides.length > 0) {
+        console.log(`Found ${pendingRides.length} pending rides, checking for updated status`);
         
-        console.log('Starting to fetch user trips... Current environment:', import.meta.env.MODE);
-        console.log('API base URL:', import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000');
-        
-        // Add debugging for authentication
-        const token = getAuthToken();
-        console.log('Authorization token available:', !!token);
-        
-        // Get all rides for the user (both created and joined)
-        const response = await rideService.getUserRides();
-        console.log('Received response:', response);
-        
-        if (!response.success) {
-          throw new Error(response.message || 'Failed to fetch rides');
-        }
-        
-        const rides = response.rides || [];
-        console.log('Processing rides:', rides.length, 'Current user:', currentUser);
-        
-        // Current date for comparison
-        const currentDate = new Date();
-        const today = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        
-        // Format rides
-        const formattedRides = rides.map(ride => {
-          // Find the current user's passenger record in this ride
-          const userPassenger = ride.passengers?.find(p => 
-            p.user === currentUser._id || 
-            (p.user && p.user._id === currentUser._id)
-          );
-          
-          // Comprehensive driver info extraction
-          let driverInfo = {
-            id: ride._id || 'unknown',
-            name: 'Unknown Driver',
-            rating: 0,
-            profilePicture: ''
-          };
-          
-          // First check if the current user is the creator/driver
-          const isCreator = (ride.creatorId === currentUser._id) || 
-                          (ride.creator && ride.creator._id === currentUser._id) ||
-                          (ride.driverId === currentUser._id) || 
-                          (ride.driverId && ride.driverId._id === currentUser._id);
-          
-          if (isCreator) {
-            // Current user is the driver
-            driverInfo = {
-              id: currentUser._id,
-              name: 'You (Driver)',
-              rating: currentUser.rating || 0,
-              profilePicture: currentUser.profilePicture || ''
-            };
-          } else {
-            // Try to extract driver info from various possible fields
+        // Use Promise.all to check all pending rides in parallel
+        const checkPromises = pendingRides.map(async (ride) => {
+          try {
+            // Check if this pending ride has been accepted by a driver
+            const statusResponse = await rideService.checkPendingRideStatus(ride._id);
+            console.log(`Status check for ride ${ride._id}:`, statusResponse);
             
-            // Check for driverId as object (populated)
-            if (ride.driverId && typeof ride.driverId === 'object') {
-              driverInfo = {
-                id: ride.driverId._id || ride.driverId.id || 'unknown',
-                name: ride.driverId.firstName ? 
-                     `${ride.driverId.firstName} ${ride.driverId.lastName || ''}` : 
-                     (ride.driverId.name || ride.driverId.username || 'Unknown Driver'),
-                rating: ride.driverId.rating || 0,
-                profilePicture: ride.driverId.profilePicture || ''
-              };
+            // If the ride has been accepted, update the ride object
+            if (statusResponse.status === 'accepted' && statusResponse.driver) {
+              console.log(`Ride ${ride._id} has been accepted by a driver!`, statusResponse.driver);
+              
+              // Find the ride in the array and update its status
+              const rideIndex = rides.findIndex(r => r._id === ride._id);
+              if (rideIndex !== -1) {
+                rides[rideIndex].status = 'scheduled';
+                rides[rideIndex].driverId = statusResponse.driver;
+                
+                // Also update any other relevant fields from the status response
+                if (statusResponse.ride) {
+                  Object.assign(rides[rideIndex], statusResponse.ride);
+                }
+                
+                console.log(`Updated ride ${ride._id} in the data array`);
+              }
             }
-            // Check for driver field (populated)
-            else if (ride.driver && typeof ride.driver === 'object') {
-              driverInfo = {
-                id: ride.driver._id || ride.driver.id || 'unknown',
-                name: ride.driver.firstName ? 
-                     `${ride.driver.firstName} ${ride.driver.lastName || ''}` : 
-                     (ride.driver.name || ride.driver.username || 'Unknown Driver'),
-                rating: ride.driver.rating || 0,
-                profilePicture: ride.driver.profilePicture || ''
-              };
-            }
-            // Check for driverInfo field (populated)
-            else if (ride.driverInfo && typeof ride.driverInfo === 'object') {
-              driverInfo = {
-                id: ride.driverInfo._id || ride.driverInfo.id || 'unknown',
-                name: ride.driverInfo.firstName ? 
-                     `${ride.driverInfo.firstName} ${ride.driverInfo.lastName || ''}` : 
-                     (ride.driverInfo.name || ride.driverInfo.username || 'Unknown Driver'),
-                rating: ride.driverInfo.rating || 0,
-                profilePicture: ride.driverInfo.profilePicture || ''
-              };
-            }
-            // Check for creator field (populated)
-            else if (ride.creator && typeof ride.creator === 'object') {
-              driverInfo = {
-                id: ride.creator._id || ride.creator.id || 'unknown',
-                name: ride.creator.firstName ? 
-                     `${ride.creator.firstName} ${ride.creator.lastName || ''}` : 
-                     (ride.creator.name || ride.creator.username || 'Unknown Driver'),
-                rating: ride.creator.rating || 0,
-                profilePicture: ride.creator.profilePicture || ''
-              };
-            }
+          } catch (err) {
+            console.error(`Error checking status for ride ${ride._id}:`, err);
+            // Continue with other rides, don't throw
           }
-          
-          // Format the ride data for display
-          return {
-            id: ride._id,
-            from: ride.source,
-            to: ride.destination,
-            date: ride.date.split('T')[0],
-            time: ride.departureTime,
-            price: ride.price,
-            seats: ride.leftSeats,
-            totalSeats: ride.totalSeats || 4,
-            bookedSeats: userPassenger?.seats || 1,
-            distance: ride.distance,
-            status: ride.status || 'scheduled',
-            driver: driverInfo,
-            isCreator,
-            isPassenger: ride.passengers?.some(p => 
-              p.user === currentUser._id || 
-              (p.user && p.user._id === currentUser._id)
-            ) || false,
-            paymentStatus: userPassenger?.paymentStatus || 'pending'
-          };
         });
         
-        // Update states with the processed ride data
-        updateTripStates(formattedRides);
+        // Wait for all status checks to complete
+        await Promise.all(checkPromises);
+      }
+      
+      // Current date for comparison
+      const currentDate = new Date();
+      const today = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      // Format rides
+      const formattedRides = rides.map(ride => {
+        // Find the current user's passenger record in this ride
+        const userPassenger = ride.passengers?.find(p => 
+          p.user === currentUser._id || 
+          (p.user && p.user._id === currentUser._id)
+        );
         
-        // Fetch ratings for completed rides
-        fetchRatings();
+        // Comprehensive driver info extraction
+        let driverInfo = {
+          id: ride._id || 'unknown',
+          name: 'Unknown Driver',
+          rating: 0,
+          profilePicture: ''
+        };
         
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching user trips:', error);
-        setError(error.message || 'Error loading trips. Please try again.');
-        setLoading(false);
-      }
-    };
+        // First check if the current user is the creator/driver
+        const isCreator = (ride.creatorId === currentUser._id) || 
+                        (ride.creator && ride.creator._id === currentUser._id) ||
+                        (ride.driverId === currentUser._id) || 
+                        (ride.driverId && ride.driverId._id === currentUser._id);
+        
+        if (isCreator) {
+          // Current user is the driver
+          driverInfo = {
+            id: currentUser._id,
+            name: 'You (Driver)',
+            rating: currentUser.rating || 0,
+            profilePicture: currentUser.profilePicture || ''
+          };
+        } else {
+          // Try to extract driver info from various possible fields
+          
+          // Check for driverId as object (populated)
+          if (ride.driverId && typeof ride.driverId === 'object') {
+            driverInfo = {
+              id: ride.driverId._id || ride.driverId.id || 'unknown',
+              name: ride.driverId.firstName ? 
+                   `${ride.driverId.firstName} ${ride.driverId.lastName || ''}` : 
+                   (ride.driverId.name || ride.driverId.username || 'Unknown Driver'),
+              rating: ride.driverId.rating || 0,
+              profilePicture: ride.driverId.profilePicture || ''
+            };
+          }
+          // Check for driver field (populated)
+          else if (ride.driver && typeof ride.driver === 'object') {
+            driverInfo = {
+              id: ride.driver._id || ride.driver.id || 'unknown',
+              name: ride.driver.firstName ? 
+                   `${ride.driver.firstName} ${ride.driver.lastName || ''}` : 
+                   (ride.driver.name || ride.driver.username || 'Unknown Driver'),
+              rating: ride.driver.rating || 0,
+              profilePicture: ride.driver.profilePicture || ''
+            };
+          }
+          // Check for driverInfo field (populated)
+          else if (ride.driverInfo && typeof ride.driverInfo === 'object') {
+            driverInfo = {
+              id: ride.driverInfo._id || ride.driverInfo.id || 'unknown',
+              name: ride.driverInfo.firstName ? 
+                   `${ride.driverInfo.firstName} ${ride.driverInfo.lastName || ''}` : 
+                   (ride.driverInfo.name || ride.driverInfo.username || 'Unknown Driver'),
+              rating: ride.driverInfo.rating || 0,
+              profilePicture: ride.driverInfo.profilePicture || ''
+            };
+          }
+          // Check for creator field (populated)
+          else if (ride.creator && typeof ride.creator === 'object') {
+            driverInfo = {
+              id: ride.creator._id || ride.creator.id || 'unknown',
+              name: ride.creator.firstName ? 
+                   `${ride.creator.firstName} ${ride.creator.lastName || ''}` : 
+                   (ride.creator.name || ride.creator.username || 'Unknown Driver'),
+              rating: ride.creator.rating || 0,
+              profilePicture: ride.creator.profilePicture || ''
+            };
+          }
+        }
+        
+        // Format the ride data for display
+        return {
+          id: ride._id,
+          from: ride.source,
+          to: ride.destination,
+          date: ride.date.split('T')[0],
+          time: ride.departureTime,
+          price: ride.price,
+          seats: ride.leftSeats,
+          totalSeats: ride.totalSeats || 4,
+          bookedSeats: userPassenger?.seats || 1,
+          distance: ride.distance,
+          status: ride.status || 'scheduled',
+          driver: driverInfo,
+          isCreator,
+          isPassenger: ride.passengers?.some(p => 
+            p.user === currentUser._id || 
+            (p.user && p.user._id === currentUser._id)
+          ) || false,
+          paymentStatus: userPassenger?.paymentStatus || 'pending'
+        };
+      });
+      
+      // Update states with the processed ride data
+      updateTripStates(formattedRides);
+      
+      // Fetch ratings for completed rides
+      fetchRatings();
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching user trips:', error);
+      setError(error.message || 'Error loading trips. Please try again.');
+      setLoading(false);
+    }
+  };
 
-    // Helper function to get auth token from cookie or Redux
-    const getAuthToken = () => {
-      // Try to get token from Redux store
-      const token = currentUser?.token;
-      
-      if (token) {
-        return token;
-      }
-      
-      // Check cookies as fallback
-      const cookies = document.cookie.split(';').map(cookie => cookie.trim());
-      const accessToken = cookies.find(cookie => cookie.startsWith('access_token='));
-      
-      if (accessToken) {
-        return accessToken.split('=')[1];
-      }
-      
-      return null;
-    };
-
+  useEffect(() => {
     // Initial fetch
     fetchUserTrips();
     
@@ -236,16 +302,28 @@ function MyTrips() {
       setActiveTab(tabParam);
     }
     
-    // Set up auto-refresh interval (every 30 seconds)
-    refreshIntervalRef.current = setInterval(() => {
-      console.log('Auto-refreshing trip data...');
+    // Set up auto-refresh interval with shorter interval for user with pending rides
+    const refreshData = async () => {
+      // Check if user has pending rides to determine refresh interval
+      const hasPendingRides = upcomingRides.some(ride => ride.status === 'pending');
+      
+      // Use a shorter interval if there are pending rides
+      const refreshInterval = hasPendingRides ? 10000 : 30000; // 10 seconds if pending, otherwise 30 seconds
+      
+      console.log(`Auto-refreshing trip data... (Interval: ${refreshInterval / 1000}s)`);
       fetchUserTrips();
-    }, 30000); // 30 seconds
+      
+      // Schedule the next refresh
+      refreshIntervalRef.current = setTimeout(refreshData, refreshInterval);
+    };
+    
+    // Start the refresh cycle
+    refreshIntervalRef.current = setTimeout(refreshData, 10000); // First refresh after 10 seconds
     
     // Clean up the interval on component unmount
     return () => {
       if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
+        clearTimeout(refreshIntervalRef.current);
       }
     };
   }, [currentUser, navigate, location]);
@@ -473,17 +551,46 @@ function MyTrips() {
       const rideDateTime = new Date(`${trip.date}T${trip.time}`);
       const rideDate = new Date(rideDateTime.getFullYear(), rideDateTime.getMonth(), rideDateTime.getDate());
       
+      console.log(`Categorizing ride ${trip.id} with status ${trip.status}`, trip);
+      
+      // Check for critical driver info to determine if the ride has been accepted
+      const hasDriver = (trip.driver && trip.driver.id !== 'unknown' && trip.driver.name !== 'Unknown Driver');
+      
       if (trip.status === 'completed' || trip.status === 'cancelled') {
+        // Completed or cancelled rides go to the completed section
         completed.push(trip);
       } else if (trip.status === 'ongoing') {
+        // Ongoing rides go to current section
         current.push(trip);
-      } else if (trip.status === 'scheduled' || trip.status === 'pending') {
+      } else if (trip.status === 'scheduled') {
+        // Scheduled rides (accepted by a driver) go to upcoming section
         // Check if the ride is today
-        if (rideDate.getTime() === today.getTime()) {
-          current.push({ ...trip, status: 'ongoing' });
-        } else if (rideDateTime > currentDate) {
-          upcoming.push(trip);
+        if (rideDate.getTime() === today.getTime() && rideDateTime <= currentDate) {
+          // If the ride is today and the scheduled time has passed, put it in current
+          current.push(trip);
         } else {
+          // Otherwise, put it in upcoming
+          upcoming.push(trip);
+        }
+      } else if (trip.status === 'pending') {
+        // Pending rides that already have a driver assigned (accepted) should go to upcoming
+        if (hasDriver) {
+          // This is a ride that has been accepted by a driver but status not yet updated
+          upcoming.push({...trip, status: 'scheduled'}); // Override status for display
+        } else {
+          // This is a truly pending ride waiting for a driver to accept
+          upcoming.push(trip);
+        }
+      } else {
+        // Default case for any other status
+        // If a ride has a date in the future, put it in upcoming
+        if (rideDateTime > currentDate) {
+          upcoming.push(trip);
+        } else if (rideDate.getTime() === today.getTime()) {
+          // If the ride is today but not marked completed, put it in current
+          current.push(trip);
+        } else {
+          // If the ride is in the past and not marked completed, assume it's completed
           completed.push({...trip, status: 'completed'});
         }
       }
@@ -493,6 +600,12 @@ function MyTrips() {
     current.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
     upcoming.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
     completed.sort((a, b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
+    
+    console.log('Categories after sorting:', { 
+      current: current.length, 
+      upcoming: upcoming.length, 
+      completed: completed.length 
+    });
     
     // Update state
     setCurrentRides(current);
@@ -1195,290 +1308,333 @@ function MyTrips() {
   };
 
   return (
-    <div className="container mx-auto px-4 pt-24 pb-12">
-      <h1 className="text-3xl font-bold text-gray-800 mb-2">My Trips</h1>
-      <p className="text-gray-600 mb-6">View and manage all your trips</p>
-      
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 bg-blue-100 rounded-full opacity-70"></div>
-          <div className="relative">
-            <h3 className="text-gray-500 text-sm font-medium mb-1">Total Trips</h3>
-            <p className="text-3xl font-bold text-gray-800">{totalCreated + totalJoined}</p>
-            <div className="mt-1 text-xs text-gray-500">All time activity</div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 bg-green-100 rounded-full opacity-70"></div>
-          <div className="relative">
-            <h3 className="text-gray-500 text-sm font-medium mb-1">Joined</h3>
-            <p className="text-3xl font-bold text-gray-800">{totalJoined}</p>
-            <div className="mt-1 text-xs text-green-600">As passenger</div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 bg-purple-100 rounded-full opacity-70"></div>
-          <div className="relative">
-            <h3 className="text-gray-500 text-sm font-medium mb-1">Booked</h3>
-            <p className="text-3xl font-bold text-gray-800">{completedRides.length}</p>
-            <div className="mt-1 text-xs text-purple-600">Completed trips</div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
-        <div className="flex">
-          <button
-            className={`flex-1 py-4 px-6 text-center font-medium ${
-              activeTab === 'current' 
-                ? 'text-blue-600 border-b-2 border-blue-500 bg-blue-50' 
-                : 'text-gray-500 hover:text-blue-500 hover:bg-gray-50'
-            }`}
-            onClick={() => setActiveTab('current')}
-          >
-            Current Trips
-          </button>
-          <button
-            className={`flex-1 py-4 px-6 text-center font-medium ${
-              activeTab === 'upcoming' 
-                ? 'text-blue-600 border-b-2 border-blue-500 bg-blue-50' 
-                : 'text-gray-500 hover:text-blue-500 hover:bg-gray-50'
-            }`}
-            onClick={() => setActiveTab('upcoming')}
-          >
-            Upcoming Trips
-          </button>
-          <button
-            className={`flex-1 py-4 px-6 text-center font-medium ${
-              activeTab === 'completed' 
-                ? 'text-blue-600 border-b-2 border-blue-500 bg-blue-50' 
-                : 'text-gray-500 hover:text-blue-500 hover:bg-gray-50'
-            }`}
-            onClick={() => setActiveTab('completed')}
-          >
-            Past Trips
-          </button>
-        </div>
-        
-        {/* Error Message */}
-        {error && (
-          <div className="p-4 bg-red-50 border-b border-red-200">
-            <div className="flex">
-              <svg className="h-5 w-5 text-red-400 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-sm text-red-800">{error}</span>
-            </div>
-          </div>
-        )}
-        
-        {/* Trips List */}
-        <div className="p-4">
-          {activeTab === 'current' && (
-            <>
-              {currentRides.length === 0 ? (
-            <div className="text-center py-12">
-              <img 
-                src="https://cdn-icons-png.flaticon.com/512/6134/6134065.png" 
-                alt="No current trips" 
-                className="w-20 h-20 mx-auto mb-4 opacity-50"
-              />
-                  <h3 className="text-lg font-medium text-gray-800 mb-2">No ongoing trips</h3>
-              <p className="text-gray-500 max-w-md mx-auto mb-6">
-                    You don't have any ongoing trips at the moment. Check your upcoming trips or find a new ride!
-              </p>
-              <div className="flex justify-center space-x-4">
-                <button
-                  onClick={() => navigate('/')}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+    <div className="min-h-screen bg-white">
+      <div className="container mx-auto px-4 pt-24 pb-20">
+        {/* Stats */}
+        <div className="mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Total Trips */}
+            <div className="bg-blue-50 rounded-lg p-5 transition-all duration-200 border border-blue-100">
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <svg className="w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <button 
+                  onClick={handleManualRefresh}
+                  disabled={refreshing}
+                  className="text-blue-600 hover:text-blue-800 flex items-center transition-colors"
+                  title="Refresh trips data"
                 >
-                  Find a Ride
-                </button>
-                <button
-                  onClick={() => setActiveTab('upcoming')}
-                  className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                  View Upcoming
+                  {refreshing ? (
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  )}
                 </button>
               </div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">{upcomingRides.length + currentRides.length + completedRides.length}</div>
+              <div className="text-sm text-gray-600">Total Trips</div>
             </div>
-              ) : (
-                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {currentRides.map(trip => renderCurrentTrip(trip))}
+
+            {/* Active Trips */}
+            <div className="bg-green-50 rounded-lg p-5 transition-all duration-200 border border-green-100">
+              <div className="flex items-center">
+                <div className="p-2 bg-green-100 rounded-full mr-3">
+                  <svg className="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">{currentRides.length}</div>
+              <div className="text-sm text-gray-600">Current Trips</div>
             </div>
-              )}
-            </>
+
+            {/* Upcoming Trips */}
+            <div className="bg-purple-50 rounded-lg p-5 transition-all duration-200 border border-purple-100">
+              <div className="flex items-center">
+                <div className="p-2 bg-purple-100 rounded-full mr-3">
+                  <svg className="w-6 h-6 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">{upcomingRides.length}</div>
+              <div className="text-sm text-gray-600">Upcoming Trips</div>
+            </div>
+
+            {/* Completed Trips */}
+            <div className="bg-yellow-50 rounded-lg p-5 transition-all duration-200 border border-yellow-100">
+              <div className="flex items-center">
+                <div className="p-2 bg-yellow-100 rounded-full mr-3">
+                  <svg className="w-6 h-6 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">{completedRides.length}</div>
+              <div className="text-sm text-gray-600">Completed Trips</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Tabs */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6 overflow-hidden">
+          <div className="flex">
+            <button
+              className={`flex-1 py-4 px-6 text-center font-medium ${
+                activeTab === 'current' 
+                  ? 'text-blue-600 border-b-2 border-blue-500 bg-blue-50' 
+                  : 'text-gray-500 hover:text-blue-500 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('current')}
+            >
+              Current Trips
+            </button>
+            <button
+              className={`flex-1 py-4 px-6 text-center font-medium ${
+                activeTab === 'upcoming' 
+                  ? 'text-blue-600 border-b-2 border-blue-500 bg-blue-50' 
+                  : 'text-gray-500 hover:text-blue-500 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('upcoming')}
+            >
+              Upcoming Trips
+            </button>
+            <button
+              className={`flex-1 py-4 px-6 text-center font-medium ${
+                activeTab === 'completed' 
+                  ? 'text-blue-600 border-b-2 border-blue-500 bg-blue-50' 
+                  : 'text-gray-500 hover:text-blue-500 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('completed')}
+            >
+              Past Trips
+            </button>
+          </div>
+          
+          {/* Error Message */}
+          {error && (
+            <div className="p-4 bg-red-50 border-b border-red-200">
+              <div className="flex">
+                <svg className="h-5 w-5 text-red-400 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm text-red-800">{error}</span>
+              </div>
+            </div>
           )}
           
-          {activeTab === 'upcoming' && (
-            <>
-              {upcomingRides.length === 0 ? (
-                <div className="text-center py-12">
-                  <img 
-                    src="https://cdn-icons-png.flaticon.com/512/6134/6134065.png" 
-                    alt="No upcoming trips" 
-                    className="w-20 h-20 mx-auto mb-4 opacity-50"
-                  />
-                  <h3 className="text-lg font-medium text-gray-800 mb-2">No upcoming trips</h3>
-                  <p className="text-gray-500 max-w-md mx-auto mb-6">
-                    You don't have any upcoming trips scheduled. Start exploring available rides or create your own!
-                  </p>
-                  <div className="flex justify-center space-x-4">
-                    <button
-                      onClick={() => navigate('/')}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      Find a Ride
-                    </button>
-                    <button
-                      onClick={() => navigate('/create-ride')}
-                      className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
-                    >
-                      Create a Ride
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {upcomingRides.map(trip => renderUpcomingTrip(trip))}
-                </div>
-              )}
-            </>
-          )}
-          
-          {activeTab === 'completed' && (
-            <>
-              {completedRides.length === 0 ? (
-                <div className="text-center py-12">
-                  <img 
-                    src="https://cdn-icons-png.flaticon.com/512/3112/3112946.png" 
-                    alt="No past trips" 
-                    className="w-20 h-20 mx-auto mb-4 opacity-50"
-                  />
-                  <h3 className="text-lg font-medium text-gray-800 mb-2">No past trips</h3>
-                  <p className="text-gray-500 max-w-md mx-auto mb-6">
-                    You haven't completed any trips yet. Once you take trips, they'll appear here.
-                  </p>
+          {/* Trips List */}
+          <div className="p-4">
+            {activeTab === 'current' && (
+              <>
+                {currentRides.length === 0 ? (
+              <div className="text-center py-12">
+                <img 
+                  src="https://cdn-icons-png.flaticon.com/512/6134/6134065.png" 
+                  alt="No current trips" 
+                  className="w-20 h-20 mx-auto mb-4 opacity-50"
+                />
+                    <h3 className="text-lg font-medium text-gray-800 mb-2">No ongoing trips</h3>
+                <p className="text-gray-500 max-w-md mx-auto mb-6">
+                      You don't have any ongoing trips at the moment. Check your upcoming trips or find a new ride!
+                </p>
+                <div className="flex justify-center space-x-4">
                   <button
                     onClick={() => navigate('/')}
                     className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     Find a Ride
                   </button>
+                  <button
+                    onClick={() => setActiveTab('upcoming')}
+                    className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    View Upcoming
+                  </button>
                 </div>
-              ) : (
-                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                  {completedRides.map(trip => renderRideCard(trip))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-      
-      {/* Login Modal */}
-      {showLoginModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full text-center">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            <h3 className="text-lg font-medium text-gray-900 mt-4">Authentication Required</h3>
-            <p className="text-sm text-gray-500 mt-2">Please sign in to view your trips</p>
-            <div className="mt-5">
-              <button
-                onClick={handleLogin}
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
-              >
-                Sign In
-              </button>
-              <button
-                onClick={() => navigate('/')}
-                className="w-full mt-3 bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition"
-              >
-                Go to Homepage
-              </button>
-            </div>
+              </div>
+                ) : (
+                  <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                    {currentRides.map(trip => renderCurrentTrip(trip))}
+              </div>
+                )}
+              </>
+            )}
+            
+            {activeTab === 'upcoming' && (
+              <>
+                {upcomingRides.length === 0 ? (
+                  <div className="text-center py-12">
+                    <img 
+                      src="https://cdn-icons-png.flaticon.com/512/6134/6134065.png" 
+                      alt="No upcoming trips" 
+                      className="w-20 h-20 mx-auto mb-4 opacity-50"
+                    />
+                    <h3 className="text-lg font-medium text-gray-800 mb-2">No upcoming trips</h3>
+                    <p className="text-gray-500 max-w-md mx-auto mb-6">
+                      You don't have any upcoming trips scheduled. Start exploring available rides or create your own!
+                    </p>
+                    <div className="flex justify-center space-x-4">
+                      <button
+                        onClick={() => navigate('/')}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Find a Ride
+                      </button>
+                      <button
+                        onClick={() => navigate('/create-ride')}
+                        className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        Create a Ride
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                    {upcomingRides.map(trip => renderUpcomingTrip(trip))}
+                  </div>
+                )}
+              </>
+            )}
+            
+            {activeTab === 'completed' && (
+              <>
+                {completedRides.length === 0 ? (
+                  <div className="text-center py-12">
+                    <img 
+                      src="https://cdn-icons-png.flaticon.com/512/3112/3112946.png" 
+                      alt="No past trips" 
+                      className="w-20 h-20 mx-auto mb-4 opacity-50"
+                    />
+                    <h3 className="text-lg font-medium text-gray-800 mb-2">No past trips</h3>
+                    <p className="text-gray-500 max-w-md mx-auto mb-6">
+                      You haven't completed any trips yet. Once you take trips, they'll appear here.
+                    </p>
+                    <button
+                      onClick={() => navigate('/')}
+                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Find a Ride
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                    {completedRides.map(trip => renderRideCard(trip))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
-      )}
-
-      {/* Rating Modal */}
-      {showRatingModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <button
-                className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition-colors"
-              >
-                <FaRegStar className="text-yellow-400" />
-                <span className="text-xl font-semibold">Rate Your Ride</span>
-              </button>
-              <button
-                onClick={() => setShowRatingModal(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-2">How was your experience?</p>
-              <div className="flex space-x-2">
-                {[1, 2, 3, 4, 5].map((value) => (
-                  <button
-                    key={value}
-                    onClick={() => setRatingValue(value)}
-                    className={`text-2xl ${ratingValue >= value ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-400 transition-colors`}
-                  >
-                    {ratingValue >= value ? <FaStar /> : <FaRegStar />}
-                  </button>
-                ))}
+        
+        {/* Login Modal */}
+        {showLoginModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-sm w-full text-center">
+              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <h3 className="text-lg font-medium text-gray-900 mt-4">Authentication Required</h3>
+              <p className="text-sm text-gray-500 mt-2">Please sign in to view your trips</p>
+              <div className="mt-5">
+                <button
+                  onClick={handleLogin}
+                  className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => navigate('/')}
+                  className="w-full mt-3 bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition"
+                >
+                  Go to Homepage
+                </button>
               </div>
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Comment (optional)
-              </label>
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                rows="3"
-                placeholder="Share your experience..."
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <button
-                onClick={() => setShowRatingModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmitRating}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Submit Rating
-              </button>
+          </div>
+        )}
+
+        {/* Rating Modal */}
+        {showRatingModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <div className="flex justify-between items-center mb-4">
+                <button
+                  className="flex items-center space-x-2 text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  <FaRegStar className="text-yellow-400" />
+                  <span className="text-xl font-semibold">Rate Your Ride</span>
+                </button>
+                <button
+                  onClick={() => setShowRatingModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-2">How was your experience?</p>
+                <div className="flex space-x-2">
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <button
+                      key={value}
+                      onClick={() => setRatingValue(value)}
+                      className={`text-2xl ${ratingValue >= value ? 'text-yellow-400' : 'text-gray-300'} hover:text-yellow-400 transition-colors`}
+                    >
+                      {ratingValue >= value ? <FaStar /> : <FaRegStar />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Comment (optional)
+                </label>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  rows="3"
+                  placeholder="Share your experience..."
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button
+                  onClick={() => setShowRatingModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitRating}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  Submit Rating
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Payment Modal - Only render when showPaymentModal is true */}
-      {showPaymentModal && rideToPayFor && (
-        <PaymentModal
-          ride={rideToPayFor}
-          onClose={() => setShowPaymentModal(false)}
-          onSuccess={handlePaymentSuccess}
-        />
-      )}
+        {/* Payment Modal - Only render when showPaymentModal is true */}
+        {showPaymentModal && rideToPayFor && (
+          <PaymentModal
+            ride={rideToPayFor}
+            onClose={() => setShowPaymentModal(false)}
+            onSuccess={handlePaymentSuccess}
+          />
+        )}
+      </div>
     </div>
   );
 }

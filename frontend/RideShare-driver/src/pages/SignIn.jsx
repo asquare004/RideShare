@@ -35,12 +35,24 @@ function SignIn() {
         body: JSON.stringify(formData),
       });
       const data = await res.json();
+      
+      // Debug logging
+      console.log('Sign-in response:', data);
+      console.log('Has token in response:', !!data.token);
+      console.log('Response headers:', Object.fromEntries([...res.headers.entries()]));
+      
       if (data.success === false) {
         dispatch(signInFailure(data.message));
         return;
       }
 
       if (res.ok) {
+        // Ensure token is available in the Redux store
+        if (!data.token && data._doc && data._doc.token) {
+          data.token = data._doc.token;
+        }
+        
+        console.log('Final user data being saved to Redux:', data);
         dispatch(signInSuccess(data));
         navigate("/");
       }

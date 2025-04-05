@@ -24,8 +24,6 @@ function MyTrips() {
     // Debug function to check driver authentication
     const checkDriverAuth = async () => {
       try {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-        
         // Check driver authentication cookies
         console.log('Current cookies:', document.cookie);
         
@@ -33,20 +31,10 @@ function MyTrips() {
         console.log('Current user from Redux:', currentUser);
         
         // Test the basic driver endpoint
-        const testResponse = await fetch(`${baseUrl}/api/driver/session-info`, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include'
-        });
+        const response = await api.get('/driver/session-info');
         
-        console.log('Driver session info response:', testResponse.status);
-        if (testResponse.ok) {
-          const data = await testResponse.json();
-          console.log('Driver session data:', data);
-        } else {
-          console.error('Failed to get driver session info');
-        }
+        console.log('Driver session info response:', response.status);
+        console.log('Driver session data:', response.data);
       } catch (err) {
         console.error('Error checking driver auth:', err);
       }
@@ -70,40 +58,33 @@ function MyTrips() {
   const fetchTrips = async () => {
     setLoading(true);
     try {
-      // Use environment variable for API base URL
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      // Extract token from cookie or Redux store for debugging
+      const cookies = document.cookie.split(';').map(cookie => cookie.trim());
+      const driverCookie = cookies.find(cookie => cookie.startsWith('driver_access_token='));
+      const token = driverCookie ? driverCookie.split('=')[1] : currentUser?.token;
+      console.log('Auth token available:', !!token, token ? `(${token.substring(0, 10)}...)` : '(none)');
       
       // Determine the endpoint based on activeTab
       let endpoint;
       switch(activeTab) {
         case 'current':
-          endpoint = '/api/driver/trips/status/ongoing';
+          endpoint = '/driver/trips/status/ongoing';
           break;
         case 'upcoming':
-          endpoint = '/api/driver/trips/status/scheduled';
+          endpoint = '/driver/trips/status/scheduled';
           break;
         case 'past':
-          endpoint = '/api/driver/trips/status/completed';
+          endpoint = '/driver/trips/status/completed';
           break;
         default:
-          endpoint = '/api/driver/trips/status/scheduled';
+          endpoint = '/driver/trips/status/scheduled';
       }
       
-      const fullUrl = `${baseUrl}${endpoint}`;
-      console.log(`Fetching trips from: ${fullUrl}`);
+      console.log(`Fetching trips from: ${endpoint}`);
       
-      const response = await fetch(fullUrl, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      });
+      const response = await api.get(endpoint);
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${activeTab} trips: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = response.data;
       console.log(`Received ${data.length} trips:`, data);
       setTrips(data);
     } catch (err) {
@@ -142,29 +123,10 @@ function MyTrips() {
         return;
       }
 
-      // Use environment variable for API base URL
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-
       // Proceed with cancellation
-      const response = await fetch(`${baseUrl}/api/driver/trips/cancel/${tripId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          driverId: currentUser._id
-        }),
-        credentials: 'include'
+      const response = await api.post(`/driver/trips/cancel/${tripId}`, {
+        driverId: currentUser._id
       });
-
-      if (!response.ok) {
-        if (response.headers.get('content-type')?.includes('application/json')) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to cancel trip');
-        } else {
-          throw new Error(`Failed to cancel trip: ${response.status} ${response.statusText}`);
-        }
-      }
 
       // Remove the canceled trip from the list
       setTrips(trips.filter(trip => trip._id !== tripId));
@@ -173,7 +135,7 @@ function MyTrips() {
       toast.success('Trip canceled successfully');
     } catch (err) {
       console.error('Error canceling trip:', err);
-      toast.error(err.message || 'Failed to cancel trip. Please try again.');
+      toast.error(err.response?.data?.message || 'Failed to cancel trip. Please try again.');
     }
   };
 
@@ -184,16 +146,7 @@ function MyTrips() {
       // Show loading toast
       const loadingToast = toast.loading('Starting trip...');
       
-      // Use environment variable for API base URL
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
-      
-      const response = await fetch(`${baseUrl}/api/rides/${tripId}/start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      });
+      const response = await api.post(`/rides/${tripId}/start`);
       
       // Clear loading toast
       toast.dismiss(loadingToast);

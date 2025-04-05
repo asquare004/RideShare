@@ -29,6 +29,26 @@ const userSlice = createSlice({
         if (profilePicture) {
           action.payload.profilePicture = profilePicture;
         }
+        
+        // Ensure token is properly extracted and stored
+        if (!action.payload.token) {
+          // Try to extract token from nested _doc object or other locations
+          if (action.payload._doc && action.payload._doc.token) {
+            action.payload.token = action.payload._doc.token;
+            console.log('Extracted token from _doc object');
+          } else if (action.payload.accessToken) {
+            action.payload.token = action.payload.accessToken;
+            console.log('Using accessToken as token');
+          }
+        }
+        
+        // Log token presence
+        if (action.payload.token) {
+          console.log('Token stored in Redux state (first 10 chars):', 
+            action.payload.token.substring(0, 10) + '...');
+        } else {
+          console.warn('No token found in user data to store in Redux');
+        }
       }
       
       state.currentUser = action.payload;

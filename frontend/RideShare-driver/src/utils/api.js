@@ -19,13 +19,32 @@ const getAuthToken = () => {
   const cookies = document.cookie.split(';').map(cookie => cookie.trim());
   const driverCookie = cookies.find(cookie => cookie.startsWith('driver_access_token='));
   
+  // Debug cookie information
+  console.log('All cookies:', cookies);
+  console.log('Found driver_access_token cookie:', !!driverCookie);
+  
   if (driverCookie) {
-    return driverCookie.split('=')[1];
+    const token = driverCookie.split('=')[1];
+    console.log('Using token from cookie (first 10 chars):', token.substring(0, 10) + '...');
+    return token;
   }
   
   // If no cookie, try to get token from Redux store
   const state = store.getState();
-  return state.user?.currentUser?.token;
+  console.log('Redux user state:', state.user);
+  
+  // Get token from multiple possible locations in the currentUser object
+  const token = state.user?.currentUser?.token || 
+                state.user?.currentUser?.accessToken || 
+                state.user?.currentUser?._doc?.token;
+  
+  if (token) {
+    console.log('Using token from Redux (first 10 chars):', token.substring(0, 10) + '...');
+  } else {
+    console.log('No token found in Redux state:', state.user?.currentUser);
+  }
+  
+  return token;
 };
 
 // Request interceptor to add auth token

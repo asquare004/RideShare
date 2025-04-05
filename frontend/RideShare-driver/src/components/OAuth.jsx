@@ -25,8 +25,11 @@ export default function OAuth() {
         });
       }
       
-      // Send data to backend
-      const res = await fetch('/api/driver/google', {
+      // Get the base URL from environment variables or use the local development URL
+      const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      
+      // Send data to backend using the full URL
+      const res = await fetch(`${baseURL}/api/driver/google`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

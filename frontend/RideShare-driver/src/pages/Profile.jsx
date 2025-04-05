@@ -6,6 +6,7 @@ import { updateUserProfile } from '../redux/user/userSlice';
 import { getProxiedImageUrl, getInitials, DEFAULT_PROFILE_IMAGE } from '../utils/imageUtils';
 
 function Profile() {
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
   const { currentUser } = useSelector(state => state.user);
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -55,7 +56,7 @@ function Profile() {
   const checkAuthStatus = async () => {
     try {
       // First check the general auth status
-      const res = await fetch('/api/driver/auth-status', {
+      const res = await fetch(`${baseURL}/api/driver/auth-status`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -69,7 +70,7 @@ function Profile() {
       // Also try the debug endpoint if we're in development mode
       if (isDebugMode) {
         try {
-          const debugRes = await fetch('/api/driver/debug-auth', {
+          const debugRes = await fetch(`${baseURL}/api/driver/debug-auth`, {
             method: 'GET',
             credentials: 'include'
           });
@@ -110,7 +111,7 @@ function Profile() {
     }
     
     try {
-      const res = await fetch(`/api/driver/profile/${driverId}`, {
+      const res = await fetch(`${baseURL}/api/driver/profile/${driverId}`, {
         method: 'GET',
         credentials: 'include',
         headers: {
@@ -202,7 +203,7 @@ function Profile() {
     }
     
     try {
-      const res = await fetch(`/api/driver/profile/${driverId}`, {
+      const res = await fetch(`${baseURL}/api/driver/profile/${driverId}`, {
         method: 'PUT',
         credentials: 'include',
         headers: {

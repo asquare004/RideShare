@@ -4,6 +4,7 @@ import { updateUserProfile } from '../redux/user/userSlice';
 import { getProxiedImageUrl, isImageUrlValid, DEFAULT_PROFILE_IMAGE } from '../utils/imageUtils';
 
 const DebugPanel = () => {
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
   const [isOpen, setIsOpen] = useState(false);
   const { currentUser } = useSelector(state => state.user);
   const dispatch = useDispatch();
@@ -24,7 +25,7 @@ const DebugPanel = () => {
   
   const checkRedirectSession = async () => {
     try {
-      const res = await fetch('/api/driver/session-info', {
+      const res = await fetch(`${baseURL}/api/driver/session-info`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -46,7 +47,7 @@ const DebugPanel = () => {
       
       // Try to fetch profile data directly
       if (currentUser?._id) {
-        const res = await fetch(`/api/driver/profile/${currentUser._id}`, {
+        const res = await fetch(`${baseURL}/api/driver/profile/${currentUser._id}`, {
           credentials: 'include'
         });
         

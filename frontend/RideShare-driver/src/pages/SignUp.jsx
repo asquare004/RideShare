@@ -5,7 +5,7 @@ import { signInStart, signInSuccess, signInFailure } from "../redux/user/userSli
 import OAuth from '../components/OAuth';
 
 export default function SignUp() {
-  
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
   const [formData, setFormData] = useState({});
   const [errorMessage, setErrorMessage] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -22,7 +22,7 @@ export default function SignUp() {
     try {
       setLoading(true);
       setErrorMessage(null);
-      const res = await fetch("/api/driver/signup", {
+      const res = await fetch(`${baseURL}/api/driver/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

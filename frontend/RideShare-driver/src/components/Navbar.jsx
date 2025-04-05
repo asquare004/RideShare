@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { signOut } from '../redux/user/userSlice';
 
 function Navbar() {
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
   const [isOpen, setIsOpen] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const { currentUser } = useSelector(state => state.user);
@@ -24,7 +25,7 @@ function Navbar() {
 
   const confirmSignOut = async () => {
     try {
-      const res = await fetch('/api/driver/signout', {
+      const res = await fetch(`${baseURL}/api/driver/signout`, {
         method: 'POST',
         credentials: 'include'
       });

@@ -4,7 +4,7 @@ export const userService = {
   // Get user profile
   getProfile: async (userId) => {
     try {
-      const response = await api.get(`/user/${userId}`);
+      const response = await api.get(`/users/${userId}`);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;
@@ -14,7 +14,7 @@ export const userService = {
   // Update user profile
   updateProfile: async (userId, userData) => {
     try {
-      const response = await api.put(`/user/update/${userId}`, userData);
+      const response = await api.put(`/users/update/${userId}`, userData);
       return response.data;
     } catch (error) {
       throw error.response?.data || error.message;

@@ -12,7 +12,6 @@
 - Environmentally conscious ride options  
 - Real-time tracking and ride management  
 
----
 
 ## 📄 Project Documents
 
@@ -36,7 +35,9 @@ All major planning and design aspects of the project are documented and accessib
 - **Progress Presentation (Regular Evaluation)**  
   [Presentation](https://gamma.app/docs/RideShare-Web-Application-Progress-Report-n49wlp9segrigm9?mode=doc)
 
----
+- **UML Diagrams (Drive Folder containing Class Diagram, State Diagram, Activity Diagram, Use Case Diagram, Sequence Diagram)**  
+  [UML Diagrams](https://drive.google.com/drive/folders/1vCTmyDwT-tOc29LXA0HLPO6WlJ9SKMdr?usp=sharing)
+
 
 ## 👥 Team
 

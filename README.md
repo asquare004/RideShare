@@ -54,7 +54,7 @@ Built using **MERN stack**, Razorpay, and scalable MongoDB schemas, it features 
 
 
 
-## 🖼️ Diagrams & Design Assets
+## 🖼️ Key Documentation and Diagrams
 
 > All major planning, design, and demonstration resources are available below:
 
